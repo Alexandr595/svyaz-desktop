@@ -7,7 +7,7 @@ Unicode true
 !include "TextFunc.nsh"
 
 !ifndef APP_VERSION
-  !define APP_VERSION "0.4.2"
+  !define APP_VERSION "0.4.3"
 !endif
 !ifndef PAYLOAD
   !error "PAYLOAD must point to a self-contained publish directory."

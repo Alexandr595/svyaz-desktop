@@ -559,6 +559,25 @@ await Check("Stopping the proxy closes existing client connections", async () =>
     try { Assert(await client.GetStream().ReadAsync(single, cancel.Token) == 0); }
     catch (IOException) { }
 });
+await Check("PAC remains available while the window synchronization context is paused", async () =>
+{
+    using var proxy = new DirectProxy("") { PacScript = "function FindProxyForURL(url, host) { return 'DIRECT'; }" };
+    var context = new PausedSynchronizationContext();
+    var previous = SynchronizationContext.Current;
+    try { SynchronizationContext.SetSynchronizationContext(context); proxy.Start(); }
+    finally { SynchronizationContext.SetSynchronizationContext(previous); }
+    try
+    {
+        using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+        using var client = new TcpClient();
+        await client.ConnectAsync(IPAddress.Loopback, proxy.Port, cancel.Token);
+        await client.GetStream().WriteAsync("GET /proxy.pac HTTP/1.1\r\nHost: localhost\r\n\r\n"u8.ToArray(), cancel.Token);
+        using var reader = new StreamReader(client.GetStream());
+        var response = await reader.ReadToEndAsync(cancel.Token);
+        Assert(response.StartsWith("HTTP/1.1 200 OK") && response.EndsWith(proxy.PacScript));
+    }
+    finally { proxy.Dispose(); context.Drain(); }
+});
 await Check("A Windows accept reset cannot leave a live-looking dead proxy", async () =>
 {
     using var proxy = new DirectProxy("");
@@ -1010,4 +1029,11 @@ sealed class FakeInternetProxy : IInternetProxySettings
     public InternetProxyState State { get; set; } = new(null, 0);
     public InternetProxyState Read() => State;
     public void Write(InternetProxyState state) => State = state;
+}
+
+sealed class PausedSynchronizationContext : SynchronizationContext
+{
+    private readonly System.Collections.Concurrent.ConcurrentQueue<(SendOrPostCallback Callback, object? State)> pending = new();
+    public override void Post(SendOrPostCallback callback, object? state) => pending.Enqueue((callback, state));
+    public void Drain() { while (pending.TryDequeue(out var item)) item.Callback(item.State); }
 }

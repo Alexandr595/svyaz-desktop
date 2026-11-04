@@ -33,7 +33,10 @@ public sealed class DirectProxy(string interfaceId,
         listener.Start(128);
         Port = ((IPEndPoint)listener.LocalEndpoint).Port;
         Volatile.Write(ref accepting, 1);
-        _ = AcceptAsync();
+        // Windows can request our PAC synchronously while resolving a system
+        // proxy on the window thread. Keep the listener and relays independent
+        // of that synchronization context, including during automatic updates.
+        _ = Task.Run(AcceptAsync);
     }
 
     private async Task AcceptAsync()
