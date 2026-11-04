@@ -6,6 +6,7 @@ namespace Svyaz.Core;
 
 public sealed record AppConfig
 {
+    public int SchemaVersion { get; init; } = 2;
     public string[] Targets { get; init; } = ServiceCatalog.AllDomains;
     public string[] Canaries { get; init; } = ["https://example.com/", "https://www.microsoft.com/"];
     public string Profile { get; init; } = "z-fake-md5";
@@ -17,7 +18,7 @@ public sealed record AppConfig
     public int TelegramLocalPort { get; init; } = 18081;
     public bool OpenBrowserOnStart { get; init; } = false;
     public bool DesktopProxy { get; init; } = true;
-    public bool DiscordVoice { get; init; } = true;
+    public bool DiscordVoice { get; init; } = false;
     public bool GlassAppearance { get; init; } = true;
     public bool CheckForUpdates { get; init; } = true;
     public bool PreviewUpdates { get; init; } = true;
@@ -28,6 +29,7 @@ public sealed record AppConfig
 
     public AppConfig Validate()
     {
+        if (SchemaVersion != 2) throw new ArgumentException("Неподдерживаемая версия настроек. Обновите приложение.");
         if (Targets is null || Targets.Length is < 1 or > 32)
             throw new ArgumentException("Укажите от 1 до 32 доменов для обработки.");
         if (Canaries is null || Canaries.Length is < 1 or > 32)
@@ -89,9 +91,17 @@ public sealed record AppConfig
         return uri.AbsoluteUri;
     }
 
-    public static AppConfig Load(string path) => File.Exists(path)
-        ? (JsonSerializer.Deserialize<AppConfig>(File.ReadAllText(path)) ?? throw new ArgumentException("Пустой конфиг.")).Validate()
-        : new AppConfig().Validate();
+    public static AppConfig Load(string path)
+    {
+        if (!File.Exists(path)) return new AppConfig().Validate();
+        var text = File.ReadAllText(path);
+        var config = JsonSerializer.Deserialize<AppConfig>(text) ?? throw new ArgumentException("Пустой конфиг.");
+        using var document = JsonDocument.Parse(text);
+        // 0.4.1 enabled experimental UDP manipulation by default. Preserve the
+        // rest of the configuration, but require an explicit choice after upgrade.
+        if (!document.RootElement.TryGetProperty(nameof(SchemaVersion), out _)) config = config with { DiscordVoice = false, SchemaVersion = 2 };
+        return config.Validate();
+    }
 
     public void Save(string path)
     {

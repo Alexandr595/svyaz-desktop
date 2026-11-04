@@ -106,6 +106,53 @@ if (args.FirstOrDefault() == "--interfaces")
     Console.WriteLine(JsonSerializer.Serialize(DirectNetwork.Choices(), new JsonSerializerOptions { WriteIndented = true }));
     return 0;
 }
+if (args.FirstOrDefault() == "--discord-udp-check")
+{
+    var config = AppConfig.Load(args[1]);
+    var result = await DiscordVoiceProbe.CheckRecentAsync(config.InterfaceId, CancellationToken.None);
+    Console.WriteLine(JsonSerializer.Serialize(result)); return result.Healthy ? 0 : 1;
+}
+if (args.FirstOrDefault() == "--chatgpt-system-proxy-state")
+{
+    Console.WriteLine("Native ChatGPT system proxy enabled: " + await ChatGptDesktopIntegration.IsEnabledAsync(CancellationToken.None)); return 0;
+}
+if (args.FirstOrDefault() == "--chatgpt-native-route-check")
+{
+    var config = AppConfig.Load(args[1]) with { ChatGptProxy = args[2], ChatGptProxyBackups = [] };
+    using var relay = new DirectProxy(config.InterfaceId, (host, port, token) => TelegramRoute.ConnectAsync(host, port, config, token));
+    relay.Start();
+    var cli = ChatGptDesktopIntegration.FindCli() ?? throw new IOException("Official native CLI not found.");
+    var start = new ProcessStartInfo(cli) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true };
+    start.ArgumentList.Add("-c"); start.ArgumentList.Add("features.respect_system_proxy=false");
+    start.ArgumentList.Add("app-server");
+    // Only this read-only diagnostic child uses the temporary relay. No thread,
+    // turn, message, login, logout or model request is created.
+    foreach (var name in new[] { "HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY" }) start.Environment[name] = $"http://127.0.0.1:{relay.Port}";
+    start.Environment["NO_PROXY"] = "127.0.0.1,localhost,::1";
+    using var child = Process.Start(start)!;
+    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(35));
+    var errors = child.StandardError.ReadToEndAsync();
+    try
+    {
+        await child.StandardInput.WriteLineAsync(JsonSerializer.Serialize(new { id = 1, method = "initialize", @params = new { clientInfo = new { name = "svyaz_transport_probe", version = "0.4.2" } } }));
+        using var initialized = await ReadRpc(child.StandardOutput, 1, timeout.Token);
+        if (initialized.RootElement.TryGetProperty("error", out _)) throw new IOException("Native initialization rejected.");
+        await child.StandardInput.WriteLineAsync("{\"method\":\"initialized\",\"params\":{}}");
+        await child.StandardInput.WriteLineAsync("{\"id\":2,\"method\":\"account/rateLimits/read\"}");
+        using var reply = await ReadRpc(child.StandardOutput, 2, timeout.Token);
+        var success = reply.RootElement.TryGetProperty("result", out var result) && result.TryGetProperty("rateLimits", out var limits) && limits.ValueKind != JsonValueKind.Null;
+        var errorCode = reply.RootElement.TryGetProperty("error", out var error) && error.TryGetProperty("code", out var code) ? code.ToString() : null;
+        Console.WriteLine(JsonSerializer.Serialize(new { success, errorCode, relay.Traffic.TotalConnections, relay.Traffic.SentBytes, relay.Traffic.ReceivedBytes }));
+        return success && relay.Traffic.TotalConnections > 0 ? 0 : 1;
+    }
+    finally
+    {
+        child.StandardInput.Close();
+        if (!child.HasExited) child.Kill(entireProcessTree: true);
+        await child.WaitForExitAsync();
+        _ = await errors;
+    }
+}
 if (args.FirstOrDefault() == "--telegram-obfuscated-check")
 {
     var config = AppConfig.Load(args[1]);
@@ -140,6 +187,24 @@ if (args.FirstOrDefault() == "--native-client-check")
         DiscordProbe.CheckAsync(new Uri($"http://127.0.0.1:{config.LocalProxyPort}"), CancellationToken.None));
     Console.WriteLine(JsonSerializer.Serialize(results));
     return results.All(r => r.Healthy) ? 0 : 1;
+}
+if (args.FirstOrDefault() == "--check-chatgpt-endpoints")
+{
+    var config = AppConfig.Load(args[2]);
+    var candidates = File.ReadAllLines(args[1]).Where(s => !string.IsNullOrWhiteSpace(s)).Take(8).ToArray();
+    using var limiter = new SemaphoreSlim(3);
+    var reports = await Task.WhenAll(candidates.Select(async candidate =>
+    {
+        await limiter.WaitAsync();
+        try
+        {
+            var checks = await Task.WhenAll(new[] { "https://api.openai.com/v1/models", "https://chatgpt.com/api/auth/session", "https://desktop.chat.openai.com/" }
+                .Select(url => HttpsProbeService.ProbeAsync(url, false, 10, CancellationToken.None, config.InterfaceId, "", [], candidate, [])));
+            return new { proxy = candidate, checks = checks.Select(r => new { host = new Uri(r.Url).Host, r.StatusCode, r.Detail }) };
+        }
+        finally { limiter.Release(); }
+    }));
+    Console.WriteLine(JsonSerializer.Serialize(reports, new JsonSerializerOptions { WriteIndented = true })); return 0;
 }
 if (args.FirstOrDefault() is "--check-proxies" or "--check-openai-proxies" or "--check-native-proxies")
 {
@@ -494,11 +559,97 @@ await Check("Stopping the proxy closes existing client connections", async () =>
     try { Assert(await client.GetStream().ReadAsync(single, cancel.Token) == 0); }
     catch (IOException) { }
 });
+await Check("A Windows accept reset cannot leave a live-looking dead proxy", async () =>
+{
+    using var proxy = new DirectProxy("");
+    var failures = 0;
+    proxy.AcceptOverride = _ =>
+    {
+        proxy.AcceptOverride = null;
+        failures++;
+        throw new SocketException((int)SocketError.ConnectionReset);
+    };
+    proxy.Start();
+    using var cancel = new CancellationTokenSource(TimeSpan.FromSeconds(4));
+    using var client = new TcpClient();
+    await client.ConnectAsync(IPAddress.Loopback, proxy.Port, cancel.Token);
+    await client.GetStream().WriteAsync(new byte[] { 5, 1, 0 }, cancel.Token);
+    var reply = new byte[2];
+    await client.GetStream().ReadExactlyAsync(reply, cancel.Token);
+    Assert(failures == 1 && proxy.IsRunning && reply.SequenceEqual(new byte[] { 5, 0 }));
+});
+await Check("Legacy settings retain routes and require a new choice for experimental Discord UDP", () =>
+{
+    var path = Path.Combine(Path.GetTempPath(), "svyaz-migrate-" + Guid.NewGuid() + ".json");
+    try
+    {
+        var text = "{\"DiscordVoice\":true,\"NetworkName\":\"Existing network\",\"TelegramProxy\":\"socks5://tg.example:1080\",\"ChatGptProxy\":\"socks5://gpt.example:1080\"}";
+        File.WriteAllText(path, text);
+        var migrated = AppConfig.Load(path);
+        Assert(!migrated.DiscordVoice && migrated.SchemaVersion == 2 && migrated.NetworkName == "Existing network");
+        Assert(migrated.TelegramProxy == "socks5://tg.example:1080" && migrated.ChatGptProxy == "socks5://gpt.example:1080");
+        Assert(File.ReadAllText(path) == text);
+        (migrated with { DiscordVoice = true }).Save(path);
+        Assert(AppConfig.Load(path).DiscordVoice);
+    }
+    finally { File.Delete(path); }
+    return Task.CompletedTask;
+});
+await Check("Default Discord voice path leaves UDP untouched while explicit opt-in remains available", () =>
+{
+    var config = new AppConfig();
+    Assert(!config.DiscordVoice && !ZapretEngine.Arguments(config, "hosts", "exclude").Any(a => a.StartsWith("--wf-udp-out=")));
+    Assert(ZapretEngine.Arguments(config with { DiscordVoice = true }, "hosts", "exclude").Contains("--filter-l7=discord"));
+    return Task.CompletedTask;
+});
+await Check("Discord UDP discovery validates an independent nonce without authentication or audio", async () =>
+{
+    using var server = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
+    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+    var response = Task.Run(async () =>
+    {
+        var packet = await server.ReceiveAsync(timeout.Token);
+        Assert(packet.Buffer.Length == 74 && BinaryPrimitives.ReadUInt16BigEndian(packet.Buffer) == 1 && BinaryPrimitives.ReadUInt16BigEndian(packet.Buffer.AsSpan(2)) == 70);
+        Assert(packet.Buffer.AsSpan(8).ToArray().All(b => b == 0));
+        packet.Buffer[1] = 2;
+        await server.SendAsync(packet.Buffer, packet.RemoteEndPoint, timeout.Token);
+    });
+    var result = await DiscordVoiceProbe.CheckAsync((IPEndPoint)server.Client.LocalEndPoint!, "", timeout.Token);
+    await response;
+    Assert(result.Healthy && result.Detail.Contains("Аудио") && result.Detail.Contains("не проверены"));
+});
+await Check("Discord UDP discovery rejects an answer for a different nonce", async () =>
+{
+    using var server = new UdpClient(new IPEndPoint(IPAddress.Loopback, 0));
+    using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+    var response = Task.Run(async () =>
+    {
+        var packet = await server.ReceiveAsync(timeout.Token);
+        packet.Buffer[1] = 2; packet.Buffer[4] ^= 1;
+        await server.SendAsync(packet.Buffer, packet.RemoteEndPoint, timeout.Token);
+    });
+    var result = await DiscordVoiceProbe.CheckAsync((IPEndPoint)server.Client.LocalEndPoint!, "", timeout.Token);
+    await response;
+    Assert(!result.Healthy && result.Detail.Contains("Некорректный"));
+});
+await Check("Discord endpoint discovery survives verbose statistics after the connection line", () =>
+{
+    var directory = Path.Combine(Path.GetTempPath(), "svyaz-discord-log-" + Guid.NewGuid());
+    Directory.CreateDirectory(directory);
+    try
+    {
+        File.WriteAllText(Path.Combine(directory, "discord-webrtc_0"), "Create connection to 104.29.153.206:19298 with ssrc: 1\n" + new string('x', 320000));
+        var endpoint = DiscordVoiceProbe.FindRecentEndpoint(directory);
+        Assert(endpoint?.Port == 19298 && endpoint.Address.Equals(IPAddress.Parse("104.29.153.206")));
+    }
+    finally { Directory.Delete(directory, true); }
+    return Task.CompletedTask;
+});
 await Check("Modern profiles always use host scope and cap TLS packet handling", () =>
 {
     foreach (var profile in ZapretEngine.Profiles.Where(p => !p.TelegramSyn))
     {
-        var arguments = ZapretEngine.Arguments(new AppConfig { Profile = profile.Id }, "hosts.txt", "exclude.txt");
+        var arguments = ZapretEngine.Arguments(new AppConfig { Profile = profile.Id, DiscordVoice = true }, "hosts.txt", "exclude.txt");
         Assert(arguments.Contains("--hostlist=hosts.txt") && arguments.Contains("--hostlist-exclude=exclude.txt"));
         Assert(arguments.Contains("--payload=tls_client_hello") && arguments.Contains("--out-range=-d4"));
         Assert(arguments.Contains("--wf-udp-out=19294-19344,50000-65535"));
@@ -799,6 +950,18 @@ async Task Check(string name, Func<Task> test)
     catch (Exception ex) { failed++; Console.WriteLine("FAIL " + name + ": " + ex); }
 }
 static void Assert(bool condition) { if (!condition) throw new Exception("Assertion failed"); }
+static async Task<JsonDocument> ReadRpc(StreamReader reader, int id, CancellationToken token)
+{
+    while (true)
+    {
+        var line = await reader.ReadLineAsync(token) ?? throw new IOException("Native diagnostic process exited.");
+        if (line.Length > 1024 * 1024) throw new IOException("Native response is too large.");
+        JsonDocument document;
+        try { document = JsonDocument.Parse(line); } catch (JsonException) { continue; }
+        if (document.RootElement.TryGetProperty("id", out var responseId) && responseId.ValueKind == JsonValueKind.Number && responseId.GetInt32() == id) return document;
+        document.Dispose();
+    }
+}
 static void Throws(Action action)
 {
     try { action(); }

@@ -16,13 +16,15 @@ public sealed class DirectProxy(string interfaceId,
     private readonly SemaphoreSlim slots = new(128);
     private int serial;
     private int disposed;
+    private int accepting;
     private long sent;
     private long received;
     private long total;
     public string? PacScript { get; set; }
     public ProxyTraffic Traffic => new(clients.Count, Interlocked.Read(ref total), Interlocked.Read(ref sent), Interlocked.Read(ref received));
     public int Port { get; private set; }
-    public bool IsRunning => Port != 0 && Volatile.Read(ref disposed) == 0;
+    public bool IsRunning => Port != 0 && Volatile.Read(ref accepting) == 1 && Volatile.Read(ref disposed) == 0;
+    internal Func<CancellationToken, ValueTask<TcpClient>>? AcceptOverride { get; set; }
     public event Action<string>? Error;
 
     public void Start()
@@ -30,6 +32,7 @@ public sealed class DirectProxy(string interfaceId,
         if (Port != 0) throw new InvalidOperationException("Локальный прокси уже запущен.");
         listener.Start(128);
         Port = ((IPEndPoint)listener.LocalEndpoint).Port;
+        Volatile.Write(ref accepting, 1);
         _ = AcceptAsync();
     }
 
@@ -39,7 +42,16 @@ public sealed class DirectProxy(string interfaceId,
         {
             while (!stop.IsCancellationRequested)
             {
-                var client = await listener.AcceptTcpClientAsync(stop.Token);
+                TcpClient client;
+                try { client = await (AcceptOverride?.Invoke(stop.Token) ?? listener.AcceptTcpClientAsync(stop.Token)); }
+                catch (SocketException ex) when (!stop.IsCancellationRequested && ex.SocketErrorCode is
+                    SocketError.ConnectionReset or SocketError.ConnectionAborted or SocketError.Interrupted or SocketError.TryAgain or SocketError.NoBufferSpaceAvailable)
+                {
+                    // An aborted pending Windows connection must not terminate the listener.
+                    Error?.Invoke("Сброс входящего соединения; локальный прокси продолжает принимать подключения.");
+                    await Task.Delay(100, stop.Token);
+                    continue;
+                }
                 if (!slots.Wait(0)) { client.Dispose(); continue; }
                 var id = Interlocked.Increment(ref serial);
                 clients[id] = client;
@@ -49,6 +61,7 @@ public sealed class DirectProxy(string interfaceId,
         }
         catch (Exception ex) when (stop.IsCancellationRequested && ex is OperationCanceledException or SocketException or ObjectDisposedException) { }
         catch (Exception ex) { Error?.Invoke("Приём локальных соединений: " + ex.Message); }
+        finally { Volatile.Write(ref accepting, 0); }
     }
 
     private async Task ServeAsync(int id, TcpClient client)

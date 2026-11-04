@@ -76,8 +76,14 @@
                   <StackPanel><TextBlock Text="◈  Discord Desktop" FontSize="17" FontWeight="SemiBold" /><TextBlock Text="Gateway / TCP + Voice / UDP" Foreground="#AD9BFF" FontSize="11" Margin="0,7,0,12" /><TextBlock x:Name="NativeDiscordState" Text="Gateway ещё не проверен. Голос проверяется в канале." Foreground="{StaticResource Muted}" TextWrapping="Wrap" MinHeight="36" FontSize="11" /><Button Content="Открыть Discord" Click="Discord_Click" HorizontalAlignment="Left" Margin="0,13,0,0" /></StackPanel>
                 </Border>
               </Grid>
-              <WrapPanel Margin="0,15,0,14"><Button x:Name="NativeCheckButton" Content="Проверить MTProto и Gateway" Click="NativeCheck_Click" IsEnabled="False" /><TextBlock Text="Без входа, сообщений и включения микрофона" FontSize="11" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="12,0,0,0" /></WrapPanel>
-              <Border Background="#25243A" CornerRadius="8" Padding="13,10"><TextBlock Text="Для голоса Discord исключите Discord из VPN. Обработка UDP IP discovery включается в настройках. Ответ HTTPS или Gateway не подтверждает слышимость в голосовом канале." Foreground="#D2C3A2" FontSize="11" TextWrapping="Wrap" LineHeight="18" /></Border>
+              <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="12" Padding="18" Margin="0,12,0,0">
+                <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                  <StackPanel><TextBlock Text="Новый ChatGPT" FontSize="17" FontWeight="SemiBold" /><TextBlock x:Name="NativeChatGptState" Text="Для нативного клиента нужно разрешить системный маршрут и затем перезапустить ChatGPT." Foreground="{StaticResource Muted}" TextWrapping="Wrap" FontSize="11" Margin="0,8,14,0" /></StackPanel>
+                  <Button x:Name="ChatGptSetupButton" Grid.Column="1" Content="Настроить ChatGPT" Click="ChatGptSetup_Click" IsEnabled="False" VerticalAlignment="Center" />
+                </Grid>
+              </Border>
+              <WrapPanel Margin="0,15,0,14"><Button x:Name="NativeCheckButton" Content="Проверить MTProto, Gateway и UDP" Click="NativeCheck_Click" IsEnabled="False" /><TextBlock Text="Без входа, сообщений и включения микрофона" FontSize="11" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="12,0,0,0" /></WrapPanel>
+              <Border Background="#25243A" CornerRadius="8" Padding="13,10"><TextBlock Text="Для прямого голоса исключите Discord из VPN и перезапустите клиент после смены маршрута. UDP по умолчанию не изменяется: экспериментальная обработка может вызывать сбросы. Gateway и UDP-проба не подтверждают слышимость." Foreground="#D2C3A2" FontSize="11" TextWrapping="Wrap" LineHeight="18" /></Border>
               <Grid Margin="0,18,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="210" /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Задержка успешных HTTPS-проверок" Foreground="{StaticResource Muted}" FontSize="11" /><Viewbox Stretch="Fill" Height="64" Margin="0,5,0,0"><Canvas Width="536" Height="64"><Line X1="0" X2="536" Y1="56" Y2="56" Stroke="#2A3650" /><Polyline x:Name="LatencyLine" Stroke="#70D7C6" StrokeThickness="2" StrokeLineJoin="Round" /></Canvas></Viewbox></StackPanel><TextBlock Grid.Column="1" Text="Только реальные измерения.&#10;До 24 последних проверок.&#10;Срок работы не гарантируется." Foreground="{StaticResource Muted}" FontSize="10" LineHeight="19" HorizontalAlignment="Right" VerticalAlignment="Center" /></Grid>
             </StackPanel>
           </ScrollViewer>
@@ -97,7 +103,7 @@
         <TabItem Header="Настройки">
           <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel x:Name="SettingsPanel" Margin="0,0,12,0">
             <CheckBox x:Name="DesktopProxyBox" Content="Подключить обычный браузер через выборочный системный PAC" IsChecked="True" Margin="0,0,0,12" />
-            <CheckBox x:Name="DiscordVoiceBox" Content="Обрабатывать UDP IP discovery Discord на выбранном интерфейсе" IsChecked="True" Margin="0,0,0,12" />
+            <CheckBox x:Name="DiscordVoiceBox" Content="Экспериментальная обработка UDP Discord — только если прямой UDP не работает" IsChecked="False" Margin="0,0,0,12" ToolTip="На некоторых сетях эта стратегия вызывает сброс голосовых соединений. По умолчанию голосовой UDP проходит без изменений." />
             <CheckBox x:Name="OpenBrowserBox" Content="Открывать отдельный браузер после запуска" IsChecked="False" Margin="0,0,0,18" />
             <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="18" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
               <StackPanel><TextBlock Text="Домены сервисов" FontWeight="SemiBold" Margin="0,0,0,8" /><TextBox x:Name="TargetsBox" AcceptsReturn="True" Height="110" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Домены для обработки" /></StackPanel>

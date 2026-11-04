@@ -24,6 +24,7 @@ public partial class MainWindow : Window
     private DateTimeOffset? connectedAt;
     private int failedChecks;
     private bool nativeChecking;
+    private bool chatGptSetupBusy;
     private bool nativeCheckLaunched;
     private readonly SessionController session;
     private readonly SessionJournal journal;
@@ -88,7 +89,8 @@ public partial class MainWindow : Window
         catch (Exception ex) { EngineLabel.Text = "Движок недоступен · см. журнал"; AddLog(ex.Message); }
         if (configError) ShowError(new ArgumentException("Файл настроек повреждён. Проверьте значения и нажмите «Сохранить настройки»."));
         AddLog("Готово к работе. Добавлены стартовые списки ChatGPT, Telegram, Discord, YouTube. Контрольные адреса замените своими критичными сервисами.");
-        AddLog("TLS/TCP 443 и IP discovery Discord/UDP. Telegram Desktop использует локальный MTProxy. Голос проверяется в самом Discord; HTTP 200 его не подтверждает.");
+        AddLog("TLS/TCP 443; UDP Discord по умолчанию проходит без изменений. Telegram Desktop использует локальный MTProxy. Голос проверяется в самом Discord; HTTP 200 его не подтверждает.");
+        NativeChatGptState.Text = config.ChatGptProxy.Length == 0 ? "Внешний SOCKS5 ChatGPT не настроен; сейчас используется прямой выход. Нативному клиенту также требуется разрешить системный маршрут." : "SOCKS5 для ChatGPT настроен. Разрешите системный маршрут кнопкой справа и полностью перезапустите ChatGPT после завершения текущей работы.";
         Loaded += (_, _) => { if (Environment.GetCommandLineArgs().Contains("--start")) Start_Click(this, new RoutedEventArgs()); };
         controlTimer.Tick += (_, _) =>
         {
@@ -295,13 +297,15 @@ public partial class MainWindow : Window
             var telegram = TelegramProbe.CheckAsync(config, timeout.Token, connector: (_, _, token) =>
                 DirectNetwork.ConnectAsync("127.0.0.1", bridge.Port, "", token), proxySecret: bridge.Secret);
             var discord = DiscordProbe.CheckAsync(new Uri($"http://127.0.0.1:{local.Port}"), timeout.Token);
-            await Task.WhenAll(telegram, discord);
+            var voice = DiscordVoiceProbe.CheckRecentAsync(config.InterfaceId, timeout.Token);
+            await Task.WhenAll(telegram, discord, voice);
             if (closing) return;
             NativeTelegramState.Text = telegram.Result.Detail;
-            NativeDiscordState.Text = discord.Result.Detail;
-            File.WriteAllText(Path.Combine(dataDirectory, "native-probes.json"), JsonSerializer.Serialize(new[] { telegram.Result, discord.Result }, new JsonSerializerOptions { WriteIndented = true }));
+            NativeDiscordState.Text = discord.Result.Detail + "\n" + voice.Result.Detail;
+            File.WriteAllText(Path.Combine(dataDirectory, "native-probes.json"), JsonSerializer.Serialize(new[] { telegram.Result, discord.Result, voice.Result }, new JsonSerializerOptions { WriteIndented = true }));
             AddLog("[Telegram MTProto] " + telegram.Result.Detail);
             AddLog("[Discord Gateway] " + discord.Result.Detail);
+            AddLog("[Discord UDP] " + voice.Result.Detail);
         }
         catch (Exception ex)
         {
@@ -314,8 +318,29 @@ public partial class MainWindow : Window
         finally { nativeChecking = false; if (!closing) NativeCheckButton.IsEnabled = proxy?.IsRunning == true; }
     }
 
+    private async void ChatGptSetup_Click(object sender, RoutedEventArgs e)
+    {
+        if (chatGptSetupBusy) return;
+        chatGptSetupBusy = true; ChatGptSetupButton.IsEnabled = false;
+        NativeChatGptState.Text = "Настраиваем системный маршрут нативного клиента…";
+        try
+        {
+            var result = await ChatGptDesktopIntegration.EnableAsync(updateLifetime.Token);
+            if (closing) return;
+            NativeChatGptState.Text = "Системный маршрут разрешён. Завершите текущую работу и полностью перезапустите ChatGPT. Доступ к модели нужно проверить в клиенте.";
+            AddLog("[ChatGPT] Системный прокси нативного клиента разрешён. Нужен перезапуск ChatGPT." + (result.BackupPath != null ? " Резервная копия конфигурации сохранена рядом с исходным файлом." : ""));
+        }
+        catch (Exception ex) { if (!closing) NativeChatGptState.Text = "Настройка ChatGPT: " + ex.Message; }
+        finally { chatGptSetupBusy = false; if (!closing) ChatGptSetupButton.IsEnabled = proxy?.IsRunning == true; }
+    }
+
     private void UpdateLiveMetrics()
     {
+        if (proxy is { IsRunning: false } && desktopProxy != null)
+        {
+            desktopProxy.Dispose(); desktopProxy = null; probes.LocalProxy = null;
+            AddLog("Локальный прокси перестал принимать соединения. Предыдущие настройки Windows восстановлены; прямой DPI-движок продолжает работать.");
+        }
         var active = proxy?.IsRunning == true;
         var elapsed = active && connectedAt.HasValue ? DateTimeOffset.Now - connectedAt.Value : TimeSpan.Zero;
         UptimeMetric.Text = $"{(int)elapsed.TotalHours:00}:{elapsed.Minutes:00}:{elapsed.Seconds:00}";
@@ -327,6 +352,7 @@ public partial class MainWindow : Window
         FailuresMetric.Text = failedChecks.ToString();
         NativeCheckButton.IsEnabled = active && !nativeChecking;
         TelegramButton.IsEnabled = active;
+        ChatGptSetupButton.IsEnabled = active && !chatGptSetupBusy;
         DesktopStatus.Text = desktopProxy != null ? "СИСТЕМНЫЙ PAC · ВКЛЮЧЁН" : "СИСТЕМНЫЙ PAC · ВЫКЛЮЧЕН";
     }
     private static string FormatBytes(long value) => value >= 1048576 ? $"{value / 1048576d:F1} МБ" : $"{value / 1024d:F0} КБ";
