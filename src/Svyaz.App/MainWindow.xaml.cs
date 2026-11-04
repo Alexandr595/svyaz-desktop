@@ -321,6 +321,12 @@ public partial class MainWindow : Window
     private async void ChatGptSetup_Click(object sender, RoutedEventArgs e)
     {
         if (chatGptSetupBusy) return;
+        var directAccess = results.Any(r => !r.IsCanary && new Uri(r.Url).Host == "chatgpt.com" && r.Healthy);
+        if (config.ChatGptProxy.Length == 0 && !directAccess)
+        {
+            NativeChatGptState.Text = "Сначала укажите рабочий SOCKS5 для ChatGPT в настройках и перезапустите подключение. Нативная настройка пока не изменена.";
+            return;
+        }
         chatGptSetupBusy = true; ChatGptSetupButton.IsEnabled = false;
         NativeChatGptState.Text = "Настраиваем системный маршрут нативного клиента…";
         try
