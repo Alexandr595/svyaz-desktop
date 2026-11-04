@@ -1,0 +1,15 @@
+**/bin/
+**/obj/
+artifacts/
+**/data/
+vendor/
+*.user
+tools/nsis/
+tools/gh/
+engine/**/*.exe
+engine/**/*.dll
+engine/**/*.sys
+engine/*.exe
+engine/*.dll
+engine/*.sys
+installer/assets/*.bmp

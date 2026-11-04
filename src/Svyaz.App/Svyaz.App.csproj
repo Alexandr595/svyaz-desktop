@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>Svyaz</AssemblyName>
+    <Version>0.4.0</Version>
+    <ApplicationIcon>Assets/svyaz.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PlatformTarget>x64</PlatformTarget>
+  </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="Assets/svyaz.ico" /><Resource Include="Assets/svyaz.png" />
+    <ProjectReference Include="../Svyaz.Core/Svyaz.Core.csproj" />
+    <Content Include="../../engine/**/*" Link="engine/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

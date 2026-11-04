@@ -1,0 +1,22 @@
+* text=auto
+*.cs text eol=lf
+*.xaml text eol=lf
+*.csproj text eol=lf
+*.props text eol=lf
+*.ps1 text eol=lf
+*.md text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.nsi text eol=lf
+*.svg text eol=lf
+*.ico binary
+*.png binary
+*.bmp binary
+*.bin binary
+*.cjs text eol=lf
+*.manifest text eol=lf
+*.Config text eol=lf
+LICENSE text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+engine/** -text

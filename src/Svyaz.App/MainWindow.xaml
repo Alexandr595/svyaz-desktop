@@ -1,0 +1,122 @@
+<Window x:Class="Svyaz.App.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+        Title="Связь · Desktop" Icon="Assets/svyaz.ico" Width="1240" Height="954" MinWidth="1080" MinHeight="850" WindowStartupLocation="CenterScreen"
+        WindowStyle="None" Background="Transparent" Foreground="{StaticResource Ink}" FontFamily="Segoe UI" FontSize="13"
+        Closing="Window_Closing" SourceInitialized="Window_SourceInitialized" StateChanged="Window_StateChanged">
+  <shell:WindowChrome.WindowChrome><shell:WindowChrome CaptionHeight="46" ResizeBorderThickness="6" GlassFrameThickness="-1" CornerRadius="16" UseAeroCaptionButtons="False" /></shell:WindowChrome.WindowChrome>
+  <Border x:Name="ShellFrame" CornerRadius="16" BorderBrush="#62445378" BorderThickness="1" Background="#C00B1221">
+  <Grid>
+    <Grid.RowDefinitions><RowDefinition Height="46" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+    <Grid Background="Transparent">
+      <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="19,0,0,0"><Image Source="Assets/svyaz.png" Width="24" Height="24" /><TextBlock Text="Связь" FontSize="13" FontWeight="SemiBold" Margin="10,0,0,0" VerticalAlignment="Center" /><TextBlock Text="DESKTOP  0.4" Foreground="#8091B0" FontSize="9" Margin="14,0,0,0" VerticalAlignment="Center" /></StackPanel>
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+        <CheckBox x:Name="GlassBox" Content="Стекло" IsChecked="True" Click="Glass_Click" Margin="0,0,18,0" VerticalAlignment="Center" ToolTip="Полупрозрачный фон с размытием на Windows 11" shell:WindowChrome.IsHitTestVisibleInChrome="True" />
+        <Button Content="&#xE921;" FontFamily="Segoe MDL2 Assets" Style="{StaticResource CaptionButton}" Click="Minimize_Click" ToolTip="Свернуть; соединения продолжат работать" shell:WindowChrome.IsHitTestVisibleInChrome="True" />
+        <Button x:Name="MaximizeButton" Content="&#xE922;" FontFamily="Segoe MDL2 Assets" Style="{StaticResource CaptionButton}" Click="Maximize_Click" ToolTip="Развернуть / восстановить" shell:WindowChrome.IsHitTestVisibleInChrome="True" />
+        <Button Content="&#xE8BB;" FontFamily="Segoe MDL2 Assets" Style="{StaticResource CaptionCloseButton}" Click="Close_Click" ToolTip="Закрыть и остановить соединения" shell:WindowChrome.IsHitTestVisibleInChrome="True" />
+      </StackPanel>
+    </Grid>
+  <Grid Grid.Row="1">
+    <Grid.ColumnDefinitions><ColumnDefinition Width="176" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+    <Border Background="#7010192A" BorderBrush="#403D4966" BorderThickness="0,0,1,0">
+      <Grid Margin="20,29,18,22">
+        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+        <StackPanel>
+          <Image Source="Assets/svyaz.png" Width="52" Height="52" HorizontalAlignment="Left" Margin="-4,0,0,0" />
+          <TextBlock Text="связь" FontSize="28" FontWeight="SemiBold" Margin="0,12,0,0" />
+          <TextBlock Text="DESKTOP / 0.4" FontSize="10" Foreground="{StaticResource Muted}" Margin="1,5,0,33" />
+          <Border Background="#292648" CornerRadius="8" Padding="12,12"><TextBlock Text="◉  Подключение" Foreground="#D3C9FF" FontWeight="SemiBold" FontSize="12" /></Border>
+          <TextBlock Text="Приложения&#10;и ваш браузер" Foreground="{StaticResource Muted}" FontSize="12" LineHeight="22" Margin="12,18,0,0" />
+        </StackPanel>
+        <StackPanel Grid.Row="2"><Border Height="1" Background="#2A3650" Margin="0,0,0,17" /><TextBlock Text="Прямой маршрут.&#10;Проверяемый результат." Foreground="{StaticResource Muted}" FontSize="11" LineHeight="20" /><TextBlock Text="WINDOWS · X64" Foreground="#63748E" FontSize="10" Margin="0,14,0,0" /></StackPanel>
+      </Grid>
+    </Border>
+    <Grid Grid.Column="1" Margin="28,25,28,18">
+      <Grid.Triggers><EventTrigger RoutedEvent="Loaded"><BeginStoryboard><Storyboard><DoubleAnimation Storyboard.TargetProperty="Opacity" From="0" To="1" Duration="0:0:0.35" /></Storyboard></BeginStoryboard></EventTrigger></Grid.Triggers>
+      <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+      <Grid Margin="0,0,0,20">
+        <StackPanel><TextBlock Text="ЦЕНТР ПОДКЛЮЧЕНИЙ" Foreground="{StaticResource Muted}" FontSize="10" /><TextBlock Text="Приложения в сети" FontSize="28" FontWeight="SemiBold" Margin="0,6,0,0" /></StackPanel>
+        <TextBlock x:Name="DesktopStatus" Text="СИСТЕМНЫЙ PAC · ВЫКЛЮЧЕН" Foreground="#9C8BFF" FontSize="10" HorizontalAlignment="Right" VerticalAlignment="Center" />
+      </Grid>
+      <Border Grid.Row="1" CornerRadius="16" BorderBrush="#384564" BorderThickness="1" Padding="23,20" Margin="0,0,0,17">
+        <Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="1,1"><GradientStop Color="#C01E2A42" /><GradientStop Color="#B0171B34" Offset="1" /></LinearGradientBrush></Border.Background>
+        <Grid>
+          <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+          <StackPanel Orientation="Horizontal"><Ellipse x:Name="StateDot" Fill="#8294AF" Width="9" Height="9" Margin="0,0,9,0" /><TextBlock x:Name="StateLabel" Text="ГОТОВО К ПОДКЛЮЧЕНИЮ" Foreground="{StaticResource Muted}" FontSize="10" FontWeight="SemiBold" /></StackPanel>
+          <TextBlock x:Name="StateTitle" Grid.Row="1" Text="Один центр для ваших сервисов" FontSize="23" FontWeight="SemiBold" Margin="0,10,0,0" />
+          <StackPanel Grid.Row="2">
+            <TextBlock x:Name="StateDetail" Text="Включите обработку, подключите Telegram Desktop и проверьте Discord. Голос проверяется отдельно от сайта." Foreground="#B2BFD5" TextWrapping="Wrap" FontSize="12" Margin="0,8,0,16" />
+            <WrapPanel>
+              <Button x:Name="StartButton" Content="Подключить  ↗" Click="Start_Click" Background="#8E79EF" Foreground="White" BorderBrush="#A997FF" Margin="0,0,9,0" />
+              <Button x:Name="StopButton" Content="Остановить" Click="Stop_Click" IsEnabled="False" Margin="0,0,9,0" />
+              <Button x:Name="CheckButton" Content="Проверить сеть" Click="Check_Click" Margin="0,0,9,0" />
+              <Button x:Name="BrowserButton" Content="Отдельный браузер" Click="Browser_Click" IsEnabled="False" />
+            </WrapPanel>
+            <ProgressBar x:Name="ScanProgress" Height="3" IsIndeterminate="True" Foreground="#A997FF" Background="#30394F" Visibility="Collapsed" Margin="0,13,0,0" />
+            <TextBlock x:Name="ProxyLabel" Text="Обычный браузер: выборочный PAC. Telegram: локальный MTProxy. Discord: прямое TCP / UDP." Foreground="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,12,0,0" />
+          </StackPanel>
+        </Grid>
+      </Border>
+      <UniformGrid Grid.Row="2" Columns="4" Margin="0,0,0,15">
+        <Border Background="{StaticResource Panel}" CornerRadius="10" Padding="16,12" Margin="0,0,10,0"><StackPanel><TextBlock Text="ВРЕМЯ СЕАНСА" FontSize="9" Foreground="{StaticResource Muted}" /><TextBlock x:Name="UptimeMetric" Text="00:00:00" FontFamily="Consolas" FontSize="23" Margin="0,6,0,0" /></StackPanel></Border>
+        <Border Background="{StaticResource Panel}" CornerRadius="10" Padding="16,12" Margin="0,0,10,0"><StackPanel><TextBlock Text="TCP-СОЕДИНЕНИЯ" FontSize="9" Foreground="{StaticResource Muted}" /><TextBlock x:Name="ConnectionsMetric" Text="0" FontSize="23" Margin="0,3,0,0" /></StackPanel></Border>
+        <Border Background="{StaticResource Panel}" CornerRadius="10" Padding="16,12" Margin="0,0,10,0"><StackPanel><TextBlock Text="ЧЕРЕЗ ЛОКАЛЬНЫЕ ПРОКСИ" FontSize="9" Foreground="{StaticResource Muted}" /><TextBlock x:Name="TrafficMetric" Text="0 КБ" FontSize="23" Margin="0,3,0,0" /></StackPanel></Border>
+        <Border Background="{StaticResource Panel}" CornerRadius="10" Padding="16,12"><StackPanel><TextBlock Text="СБОИ КОНТРОЛЯ" FontSize="9" Foreground="{StaticResource Muted}" /><TextBlock x:Name="FailuresMetric" Text="0" FontSize="23" Margin="0,3,0,0" /></StackPanel></Border>
+      </UniformGrid>
+      <TabControl x:Name="Tabs" Grid.Row="3" Background="Transparent" BorderThickness="0" Padding="0,14,0,0">
+        <TabItem Header="Приложения">
+          <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="0,0,4,0">
+              <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="12" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                <Border Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="12" Padding="18">
+                  <StackPanel><TextBlock Text="↗  Telegram Desktop" FontSize="17" FontWeight="SemiBold" /><TextBlock Text="MTProto → официальный WebSocket" Foreground="#7AD8F0" FontSize="11" Margin="0,7,0,12" /><TextBlock x:Name="NativeTelegramState" Text="Транспорт ещё не проверен" Foreground="{StaticResource Muted}" TextWrapping="Wrap" MinHeight="36" FontSize="11" /><Button x:Name="TelegramButton" Content="Подключить Telegram" Click="Telegram_Click" IsEnabled="False" HorizontalAlignment="Left" Margin="0,13,0,0" /></StackPanel>
+                </Border>
+                <Border Grid.Column="2" Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="12" Padding="18">
+                  <StackPanel><TextBlock Text="◈  Discord Desktop" FontSize="17" FontWeight="SemiBold" /><TextBlock Text="Gateway / TCP + Voice / UDP" Foreground="#AD9BFF" FontSize="11" Margin="0,7,0,12" /><TextBlock x:Name="NativeDiscordState" Text="Gateway ещё не проверен. Голос проверяется в канале." Foreground="{StaticResource Muted}" TextWrapping="Wrap" MinHeight="36" FontSize="11" /><Button Content="Открыть Discord" Click="Discord_Click" HorizontalAlignment="Left" Margin="0,13,0,0" /></StackPanel>
+                </Border>
+              </Grid>
+              <WrapPanel Margin="0,15,0,14"><Button x:Name="NativeCheckButton" Content="Проверить MTProto и Gateway" Click="NativeCheck_Click" IsEnabled="False" /><TextBlock Text="Без входа, сообщений и включения микрофона" FontSize="11" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="12,0,0,0" /></WrapPanel>
+              <Border Background="#25243A" CornerRadius="8" Padding="13,10"><TextBlock Text="Для голоса Discord исключите Discord из VPN. Обработка UDP IP discovery включается в настройках. Ответ HTTPS или Gateway не подтверждает слышимость в голосовом канале." Foreground="#D2C3A2" FontSize="11" TextWrapping="Wrap" LineHeight="18" /></Border>
+              <Grid Margin="0,18,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="210" /></Grid.ColumnDefinitions><StackPanel><TextBlock Text="Задержка успешных HTTPS-проверок" Foreground="{StaticResource Muted}" FontSize="11" /><Viewbox Stretch="Fill" Height="64" Margin="0,5,0,0"><Canvas Width="536" Height="64"><Line X1="0" X2="536" Y1="56" Y2="56" Stroke="#2A3650" /><Polyline x:Name="LatencyLine" Stroke="#70D7C6" StrokeThickness="2" StrokeLineJoin="Round" /></Canvas></Viewbox></StackPanel><TextBlock Grid.Column="1" Text="Только реальные измерения.&#10;До 24 последних проверок.&#10;Срок работы не гарантируется." Foreground="{StaticResource Muted}" FontSize="10" LineHeight="19" HorizontalAlignment="Right" VerticalAlignment="Center" /></Grid>
+            </StackPanel>
+          </ScrollViewer>
+        </TabItem>
+        <TabItem Header="Диагностика">
+          <Grid><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+            <Grid Margin="0,0,0,12"><TextBlock x:Name="LastCheck" Text="Проверок пока нет" Foreground="{StaticResource Muted}" /><StackPanel Orientation="Horizontal" HorizontalAlignment="Right"><TextBlock Text="HTTP: " Foreground="{StaticResource Muted}" /><TextBlock x:Name="TargetMetric" Text="—" Margin="0,0,17,0" /><TextBlock Text="Контроль: " Foreground="{StaticResource Muted}" /><TextBlock x:Name="CanaryMetric" Text="—" Margin="0,0,17,0" /><TextBlock x:Name="LatencyMetric" Text="—" /></StackPanel></Grid>
+            <Border Grid.Row="1" Background="{StaticResource Panel}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="8"><Grid>
+              <DataGrid x:Name="ResultsGrid" AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False" HeadersVisibility="Column" GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="#25324A" BorderThickness="0" Background="Transparent" Foreground="{StaticResource Ink}" RowHeight="39" SelectionMode="Single" FontSize="12">
+                <DataGrid.Columns><DataGridTextColumn Header="АДРЕС" Binding="{Binding Host}" Width="1.1*" /><DataGridTextColumn Header="МАРШРУТ" Binding="{Binding Role}" Width="1.1*" /><DataGridTextColumn Header="РЕЗУЛЬТАТ" Binding="{Binding Result}" Width="2*" /><DataGridTextColumn Header="ВРЕМЯ" Binding="{Binding Latency}" Width="80" /></DataGrid.Columns>
+                <DataGrid.RowStyle><Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}"><Setter Property="ToolTip" Value="{Binding FullDetail}" /></Style></DataGrid.RowStyle>
+              </DataGrid><TextBlock x:Name="EmptyHint" Text="Проверки появятся после запуска" Foreground="{StaticResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False" />
+            </Grid></Border>
+            <TextBlock Grid.Row="2" Text="2xx/3xx — ответ страницы. 403 — доступ не подтверждён. Функции аккаунтов и голос этим тестом не проверяются." Foreground="{StaticResource Muted}" FontSize="11" TextWrapping="Wrap" Margin="0,12,0,0" />
+          </Grid>
+        </TabItem>
+        <TabItem Header="Настройки">
+          <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel x:Name="SettingsPanel" Margin="0,0,12,0">
+            <CheckBox x:Name="DesktopProxyBox" Content="Подключить обычный браузер через выборочный системный PAC" IsChecked="True" Margin="0,0,0,12" />
+            <CheckBox x:Name="DiscordVoiceBox" Content="Обрабатывать UDP IP discovery Discord на выбранном интерфейсе" IsChecked="True" Margin="0,0,0,12" />
+            <CheckBox x:Name="OpenBrowserBox" Content="Открывать отдельный браузер после запуска" IsChecked="False" Margin="0,0,0,18" />
+            <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="18" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+              <StackPanel><TextBlock Text="Домены сервисов" FontWeight="SemiBold" Margin="0,0,0,8" /><TextBox x:Name="TargetsBox" AcceptsReturn="True" Height="110" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Домены для обработки" /></StackPanel>
+              <StackPanel Grid.Column="2"><TextBlock Text="Контрольные HTTPS-адреса" FontWeight="SemiBold" Margin="0,0,0,8" /><TextBox x:Name="CanariesBox" AcceptsReturn="True" Height="110" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto" AutomationProperties.Name="Контрольные HTTPS-адреса" /></StackPanel>
+            </Grid>
+            <WrapPanel Margin="0,12,0,16"><Button Content="+ ChatGPT" Tag="ChatGPT" Click="Preset_Click" Margin="0,0,7,0" /><Button Content="+ Telegram" Tag="Telegram" Click="Preset_Click" Margin="0,0,7,0" /><Button Content="+ Discord" Tag="Discord" Click="Preset_Click" Margin="0,0,7,0" /><Button Content="+ YouTube" Tag="YouTube" Click="Preset_Click" /></WrapPanel>
+            <WrapPanel Margin="0,0,0,15"><StackPanel Margin="0,0,18,0"><TextBlock Text="Профиль TLS" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,0,0,6" /><ComboBox x:Name="ProfileBox" Width="275" AutomationProperties.Name="Профиль обработки" /></StackPanel><StackPanel Margin="0,0,18,0"><TextBlock Text="Интервал, с" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,0,0,6" /><TextBox x:Name="IntervalBox" Width="100" Text="30" /></StackPanel><StackPanel><TextBlock Text="Провайдер · метка" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,0,0,6" /><TextBox x:Name="NetworkBox" Width="220" /></StackPanel></WrapPanel>
+            <TextBlock Text="Физический сетевой интерфейс" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,0,0,6" /><ComboBox x:Name="InterfaceBox" Width="360" HorizontalAlignment="Left" AutomationProperties.Name="Сетевой интерфейс" Margin="0,0,0,15" />
+            <TextBlock Text="Внешний SOCKS5 для Telegram, включая WSS" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,0,0,6" /><TextBox x:Name="TelegramProxyBox" Width="420" HorizontalAlignment="Left" Margin="0,0,0,12" />
+            <TextBlock Text="Внешний SOCKS5 для ChatGPT" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,0,0,6" /><TextBox x:Name="ChatGptProxyBox" Width="420" HorizontalAlignment="Left" Margin="0,0,0,12" />
+            <TextBlock Text="Публичные узлы могут отключиться в любой момент; можно указать собственный SOCKS5. Сертификаты TLS проверяются. Два сбоя контрольного сервиса подряд останавливают обработку. Настройки системного прокси восстанавливаются при остановке." FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap" LineHeight="18" Margin="0,0,0,14" /><Button Content="Сохранить настройки" Click="Save_Click" HorizontalAlignment="Left" />
+          </StackPanel></ScrollViewer>
+        </TabItem>
+        <TabItem Header="Журнал">
+          <Grid><Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions><TextBox x:Name="LogBox" IsReadOnly="True" AcceptsReturn="True" FontFamily="Consolas" FontSize="11" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" /><TextBlock Grid.Row="1" Text="data/session.log · data/status.json · data/native-probes.json" FontSize="10" Foreground="{StaticResource Muted}" Margin="0,9,0,0" /></Grid>
+        </TabItem>
+      </TabControl>
+      <Grid Grid.Row="4" Margin="0,15,0,0"><StackPanel VerticalAlignment="Center"><TextBlock x:Name="EngineLabel" Text="Проверяем комплект движка…" Foreground="{StaticResource Muted}" FontSize="10" /><TextBlock x:Name="AdminLabel" Text="Для WinDivert нужны права администратора" Foreground="#6F819E" FontSize="10" Margin="0,4,0,0" /></StackPanel><Button Content="Экспорт отчёта ↓" Click="Export_Click" HorizontalAlignment="Right" MinHeight="34" Padding="12,6" FontSize="11" /></Grid>
+    </Grid>
+  </Grid>
+  </Grid>
+  </Border>
+</Window>

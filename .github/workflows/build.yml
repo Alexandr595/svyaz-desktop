@@ -1,0 +1,30 @@
+name: Windows build
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: '8.0.x'
+      - name: Fetch pinned official engines
+        shell: pwsh
+        run: ./tools/fetch-engines.ps1
+      - name: Check core behavior
+        shell: pwsh
+        run: dotnet run --project tests/Svyaz.Checks/Svyaz.Checks.csproj -c Release
+      - name: Package portable app
+        shell: pwsh
+        run: ./build.ps1 -Stage
+      - name: Build self-contained installer
+        shell: pwsh
+        run: ./installer/build-installer.ps1
+      - name: Test installer in a disposable directory
+        shell: pwsh
+        run: ./installer/smoke-test.ps1
