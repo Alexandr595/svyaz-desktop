@@ -1,9 +1,9 @@
-param([string]$Installer = 'artifacts/Svyaz-Setup-0.4.0-x64.exe')
+param([string]$Installer = '', [string]$PreviousInstaller = '')
 $ErrorActionPreference = 'Stop'
 $workspace = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 Set-Location -LiteralPath $workspace
 $runId = [Guid]::NewGuid().ToString('N')
-$testRoot = Join-Path $workspace "artifacts\installer-smoke-$runId"
+$testRoot = Join-Path $workspace "artifacts\installer-smoke-$runId Связь Desktop"
 $fixture = Join-Path $workspace "artifacts\installer-import-$runId"
 foreach ($path in @($testRoot,$fixture)) {
     if (![IO.Path]::GetFullPath($path).StartsWith(($workspace.TrimEnd('\') + '\artifacts\'), [StringComparison]::OrdinalIgnoreCase)) { throw 'Test path outside artifacts.' }
@@ -13,14 +13,22 @@ $fixtureConfig = '{"NetworkName":"Installer smoke fixture","DesktopProxy":false,
 $fixtureSecret = '00112233445566778899AABBCCDDEEFF'
 [IO.File]::WriteAllText((Join-Path $fixture 'settings.json'), $fixtureConfig)
 [IO.File]::WriteAllText((Join-Path $fixture 'telegram-local-secret.txt'), $fixtureSecret)
+if (!$Installer) {
+    [xml]$project = Get-Content -LiteralPath src/Svyaz.App/Svyaz.App.csproj
+    $Installer = "artifacts/Svyaz-Setup-$($project.Project.PropertyGroup.Version)-x64.exe"
+}
 $setup = (Resolve-Path -LiteralPath $Installer).Path
-function Install-TestCopy {
-    $process = Start-Process -FilePath $setup -ArgumentList @('/S','/TESTMODE',"/IMPORTDATA=$fixture","/D=$testRoot") -WindowStyle Hidden -PassThru
+if ([Diagnostics.FileVersionInfo]::GetVersionInfo($setup).ProductName -cne 'Связь Desktop') { throw 'Installer Russian text is not UTF-8.' }
+function Install-TestCopy([string]$Executable = $setup, [switch]$Update) {
+    $arguments = @('/S','/TESTMODE',"/IMPORTDATA=$fixture")
+    if ($Update) { $arguments += '/UPDATE' }
+    $arguments += "/D=$testRoot"
+    $process = Start-Process -FilePath $Executable -ArgumentList $arguments -WindowStyle Hidden -PassThru
     if (!$process.WaitForExit(60000)) { $process.Kill(); $process.WaitForExit(); throw 'Installer timeout.' }
     if ($process.ExitCode -ne 0) { throw "Installer exit $($process.ExitCode)" }
 }
 try {
-    Install-TestCopy
+    if ($PreviousInstaller) { Install-TestCopy -Executable (Resolve-Path -LiteralPath $PreviousInstaller).Path } else { Install-TestCopy }
     foreach ($name in @('Svyaz.exe','coreclr.dll','Uninstall.exe','engine\zapret2\winws2.exe')) {
         if (!(Test-Path -LiteralPath (Join-Path $testRoot $name))) { throw "Missing installed file: $name" }
     }
@@ -31,8 +39,9 @@ try {
     if ([IO.File]::ReadAllText($settings) -ne $fixtureConfig -or [IO.File]::ReadAllText($secret) -ne $fixtureSecret) { throw 'Settings import failed.' }
     [IO.File]::WriteAllText((Join-Path $testRoot 'user-file.txt'), 'This user file must survive uninstall.')
     [IO.File]::WriteAllText((Join-Path $fixture 'settings.json'), '{"NetworkName":"Replacement must not overwrite"}')
-    Install-TestCopy
+    Install-TestCopy -Update
     if ([IO.File]::ReadAllText($settings) -ne $fixtureConfig) { throw 'Upgrade overwrote existing settings.' }
+    if ([Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $testRoot 'Uninstall.exe')).ProductName -cne 'Связь Desktop') { throw 'Uninstaller Russian text is corrupted.' }
     $start = [Diagnostics.ProcessStartInfo]::new((Join-Path $testRoot 'Svyaz.exe'))
     $start.UseShellExecute = $false; $start.CreateNoWindow = $true
     $start.ArgumentList.Add('--stop')
@@ -48,7 +57,7 @@ try {
     if (Test-Path -LiteralPath (Join-Path $testRoot 'Svyaz.exe')) { throw 'Uninstall did not remove the app.' }
     if (Test-Path -LiteralPath (Join-Path $testRoot 'installation.id')) { throw 'Uninstaller did not finish.' }
     if (!(Test-Path -LiteralPath $settings) -or !(Test-Path -LiteralPath (Join-Path $testRoot 'user-file.txt'))) { throw 'Uninstall removed user data.' }
-    $report = [ordered]@{ checkedAt=[DateTimeOffset]::Now; install=$true; selfContained=$true; import=$true; upgradePreservesSettings=$true; uninstall=$true; userDataPreserved=$true; testMode=$true }
+    $report = [ordered]@{ checkedAt=[DateTimeOffset]::Now; install=$true; selfContained=$true; import=$true; updateMode=$true; russianText=$true; spacedPath=$true; previousVersion=([bool]$PreviousInstaller); upgradePreservesSettings=$true; uninstall=$true; userDataPreserved=$true; testMode=$true }
     $report | ConvertTo-Json | Set-Content -LiteralPath artifacts/installer-smoke.json -Encoding utf8
     Write-Output 'PASS install, self-contained launch, settings import, upgrade, uninstall, and user-data preservation.'
 }

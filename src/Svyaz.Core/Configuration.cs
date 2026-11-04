@@ -19,6 +19,8 @@ public sealed record AppConfig
     public bool DesktopProxy { get; init; } = true;
     public bool DiscordVoice { get; init; } = true;
     public bool GlassAppearance { get; init; } = true;
+    public bool CheckForUpdates { get; init; } = true;
+    public bool PreviewUpdates { get; init; } = true;
     public string ChatGptProxy { get; init; } = "";
     public string[] ChatGptProxyBackups { get; init; } = [];
     public int IntervalSeconds { get; init; } = 30;

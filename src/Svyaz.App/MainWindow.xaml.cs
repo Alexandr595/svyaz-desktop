@@ -103,6 +103,7 @@ public partial class MainWindow : Window
         };
         Loaded += (_, _) => controlTimer.Start();
         Closed += (_, _) => controlTimer.Stop();
+        InitializeUpdates();
     }
 
     private void Window_SourceInitialized(object? sender, EventArgs e) => ApplyAppearance();
@@ -370,7 +371,7 @@ public partial class MainWindow : Window
         {
             File.WriteAllText(dialog.FileName, JsonSerializer.Serialize(new
             {
-                version = "0.4.0", exportedAt = DateTimeOffset.Now, config, results,
+                version = CurrentVersion.ToString(), exportedAt = DateTimeOffset.Now, config, results,
                 events = log.ToArray(), note = "HTTP/1.1 через выбранный интерфейс и настроенные маршруты. Во время сеанса пробы проходят через тот же локальный прокси, что и отдельный браузер. Редиректы и функции аккаунтов не проверяются."
             }, new JsonSerializerOptions { WriteIndented = true }));
             AddLog("Отчёт сохранён локально.");
@@ -504,6 +505,7 @@ public partial class MainWindow : Window
     private void Window_Closing(object? sender, CancelEventArgs e)
     {
         closing = true;
+        StopUpdates();
         operation?.Cancel();
         StopProxy();
         engine.Dispose();

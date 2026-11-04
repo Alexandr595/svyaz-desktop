@@ -37,7 +37,7 @@ foreach ($item in Get-ChildItem -LiteralPath $payload -Directory -Recurse | Sort
 }
 [IO.File]::WriteAllLines($manifest, $lines, [Text.UTF8Encoding]::new($false))
 $output = Join-Path $workspace "artifacts\Svyaz-Setup-$version-x64.exe"
-& $compiler '/V2' "/DAPP_VERSION=$version" "/DPAYLOAD=$payload" "/DDELETE_MANIFEST=$manifest" "/DOUTPUT_FILE=$output" (Join-Path $PSScriptRoot 'Svyaz.nsi')
+& $compiler '/V2' '/INPUTCHARSET' 'UTF8' "/DAPP_VERSION=$version" "/DPAYLOAD=$payload" "/DDELETE_MANIFEST=$manifest" "/DOUTPUT_FILE=$output" (Join-Path $PSScriptRoot 'Svyaz.nsi')
 if ($LASTEXITCODE -ne 0) { throw 'NSIS compilation failed.' }
 Get-FileHash -LiteralPath $output -Algorithm SHA256
 Write-Output "Installer ready: $output"

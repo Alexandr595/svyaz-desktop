@@ -7,7 +7,7 @@ Unicode true
 !include "TextFunc.nsh"
 
 !ifndef APP_VERSION
-  !define APP_VERSION "0.4.0"
+  !define APP_VERSION "0.4.1"
 !endif
 !ifndef PAYLOAD
   !error "PAYLOAD must point to a self-contained publish directory."
@@ -60,6 +60,7 @@ Var TestMode
 Var ImportData
 Var ImportField
 Var ImportDialog
+Var UpdateMode
 
 Function .onInit
   ${IfNot} ${RunningX64}
@@ -69,6 +70,7 @@ Function .onInit
   SetShellVarContext current
   SetRegView 64
   StrCpy $TestMode "0"
+  StrCpy $UpdateMode "0"
   ${GetParameters} $0
   ClearErrors
   ${GetOptions} $0 "/TESTMODE" $1
@@ -76,7 +78,23 @@ Function .onInit
     StrCpy $TestMode "1"
   ${EndIf}
   ClearErrors
+  ${GetOptions} $0 "/UPDATE" $1
+  ${IfNot} ${Errors}
+    StrCpy $UpdateMode "1"
+    SetSilent silent
+  ${EndIf}
+  ClearErrors
   ${GetOptions} $0 "/IMPORTDATA=" $ImportData
+FunctionEnd
+
+Function .onInstSuccess
+  ${If} $UpdateMode == "1"
+  ${AndIf} $TestMode != "1"
+    Exec '"$INSTDIR\Svyaz.exe" --handoff'
+    ${If} ${Errors}
+      MessageBox MB_ICONEXCLAMATION "Обновление установлено. Откройте «Связь» с ярлыка."
+    ${EndIf}
+  ${EndIf}
 FunctionEnd
 
 Function ImportPage
@@ -155,6 +173,11 @@ Section "Связь Desktop" CoreSection
   FileClose $0
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   ${If} $TestMode != "1"
+    ; Remove only the exact names emitted by the UTF-8/CP1251 bug in 0.4.0.
+    Delete "$DESKTOP\РЎРІСЏР·СЊ Desktop.lnk"
+    Delete "$SMPROGRAMS\РЎРІСЏР·СЊ\РЎРІСЏР·СЊ Desktop.lnk"
+    Delete "$SMPROGRAMS\РЎРІСЏР·СЊ\РЈРґР°Р»РёС‚СЊ.lnk"
+    RMDir "$SMPROGRAMS\РЎРІСЏР·СЊ"
     CreateDirectory "$SMPROGRAMS\Связь"
     CreateShortcut "$SMPROGRAMS\Связь\Связь Desktop.lnk" "$INSTDIR\Svyaz.exe" "" "$INSTDIR\Svyaz.exe" 0
     CreateShortcut "$SMPROGRAMS\Связь\Удалить.lnk" "$INSTDIR\Uninstall.exe"

@@ -8,8 +8,9 @@
   <Grid>
     <Grid.RowDefinitions><RowDefinition Height="46" /><RowDefinition Height="*" /></Grid.RowDefinitions>
     <Grid Background="Transparent">
-      <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="19,0,0,0"><Image Source="Assets/svyaz.png" Width="24" Height="24" /><TextBlock Text="Связь" FontSize="13" FontWeight="SemiBold" Margin="10,0,0,0" VerticalAlignment="Center" /><TextBlock Text="DESKTOP  0.4" Foreground="#8091B0" FontSize="9" Margin="14,0,0,0" VerticalAlignment="Center" /></StackPanel>
+      <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="19,0,0,0"><Image Source="Assets/svyaz.png" Width="24" Height="24" /><TextBlock Text="Связь" FontSize="13" FontWeight="SemiBold" Margin="10,0,0,0" VerticalAlignment="Center" /><TextBlock x:Name="TitleVersion" Text="DESKTOP" Foreground="#8091B0" FontSize="9" Margin="14,0,0,0" VerticalAlignment="Center" /></StackPanel>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+        <Button x:Name="UpdateButton" Content="Доступно обновление" Visibility="Collapsed" Click="Update_Click" Background="#34345B" BorderBrush="#8074C8" Foreground="#DED6FF" FontSize="11" Padding="12,4" MinHeight="28" VerticalAlignment="Center" Margin="0,0,18,0" shell:WindowChrome.IsHitTestVisibleInChrome="True" AutomationProperties.Name="Обновить Связь" />
         <CheckBox x:Name="GlassBox" Content="Стекло" IsChecked="True" Click="Glass_Click" Margin="0,0,18,0" VerticalAlignment="Center" ToolTip="Полупрозрачный фон с размытием на Windows 11" shell:WindowChrome.IsHitTestVisibleInChrome="True" />
         <Button Content="&#xE921;" FontFamily="Segoe MDL2 Assets" Style="{StaticResource CaptionButton}" Click="Minimize_Click" ToolTip="Свернуть; соединения продолжат работать" shell:WindowChrome.IsHitTestVisibleInChrome="True" />
         <Button x:Name="MaximizeButton" Content="&#xE922;" FontFamily="Segoe MDL2 Assets" Style="{StaticResource CaptionButton}" Click="Maximize_Click" ToolTip="Развернуть / восстановить" shell:WindowChrome.IsHitTestVisibleInChrome="True" />
@@ -24,7 +25,7 @@
         <StackPanel>
           <Image Source="Assets/svyaz.png" Width="52" Height="52" HorizontalAlignment="Left" Margin="-4,0,0,0" />
           <TextBlock Text="связь" FontSize="28" FontWeight="SemiBold" Margin="0,12,0,0" />
-          <TextBlock Text="DESKTOP / 0.4" FontSize="10" Foreground="{StaticResource Muted}" Margin="1,5,0,33" />
+          <TextBlock x:Name="SidebarVersion" Text="DESKTOP" FontSize="10" Foreground="{StaticResource Muted}" Margin="1,5,0,33" />
           <Border Background="#292648" CornerRadius="8" Padding="12,12"><TextBlock Text="◉  Подключение" Foreground="#D3C9FF" FontWeight="SemiBold" FontSize="12" /></Border>
           <TextBlock Text="Приложения&#10;и ваш браузер" Foreground="{StaticResource Muted}" FontSize="12" LineHeight="22" Margin="12,18,0,0" />
         </StackPanel>
@@ -108,6 +109,18 @@
             <TextBlock Text="Внешний SOCKS5 для Telegram, включая WSS" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,0,0,6" /><TextBox x:Name="TelegramProxyBox" Width="420" HorizontalAlignment="Left" Margin="0,0,0,12" />
             <TextBlock Text="Внешний SOCKS5 для ChatGPT" Foreground="{StaticResource Muted}" FontSize="11" Margin="0,0,0,6" /><TextBox x:Name="ChatGptProxyBox" Width="420" HorizontalAlignment="Left" Margin="0,0,0,12" />
             <TextBlock Text="Публичные узлы могут отключиться в любой момент; можно указать собственный SOCKS5. Сертификаты TLS проверяются. Два сбоя контрольного сервиса подряд останавливают обработку. Настройки системного прокси восстанавливаются при остановке." FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap" LineHeight="18" Margin="0,0,0,14" /><Button Content="Сохранить настройки" Click="Save_Click" HorizontalAlignment="Left" />
+          </StackPanel></ScrollViewer>
+        </TabItem>
+        <TabItem Header="Обновления">
+          <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="0,0,12,0">
+            <TextBlock Text="Новые версии из GitHub Releases" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,12" />
+            <TextBlock x:Name="UpdateStatus" Text="Проверяем наличие обновлений…" Foreground="{StaticResource Ink}" TextWrapping="Wrap" Margin="0,0,0,16" />
+            <WrapPanel Margin="0,0,0,12"><Button x:Name="CheckUpdatesButton" Content="Проверить обновления" Click="CheckUpdates_Click" Margin="0,0,10,0" /><Button x:Name="InstallUpdateButton" Content="Скачать и обновить" Visibility="Collapsed" Click="Update_Click" Background="#34345B" BorderBrush="#8074C8" /></WrapPanel>
+            <ProgressBar x:Name="UpdateProgress" Height="4" Maximum="100" Visibility="Collapsed" Foreground="#A997FF" Background="#30394F" Margin="0,0,0,16" />
+            <CheckBox x:Name="AutoUpdatesBox" Content="Проверять при запуске и раз в четыре часа" IsChecked="True" Click="UpdateSettings_Click" Margin="0,4,0,12" />
+            <CheckBox x:Name="PreviewUpdatesBox" Content="Показывать предварительные выпуски" IsChecked="True" Click="UpdateSettings_Click" Margin="0,0,0,16" />
+            <TextBlock Text="Установка начинается только по вашей кнопке. Файл загружается из Alexandr595/svyaz-desktop и проверяется по SHA-256 из GitHub. Затем соединения «Связи» остановятся, программа обновится и откроется снова. Настройки сохранятся; подключение после обновления включается вручную." Foreground="{StaticResource Muted}" FontSize="12" TextWrapping="Wrap" LineHeight="21" Margin="0,0,0,14" />
+            <Button Content="Открыть страницу выпусков ↗" Click="Releases_Click" HorizontalAlignment="Left" />
           </StackPanel></ScrollViewer>
         </TabItem>
         <TabItem Header="Журнал">

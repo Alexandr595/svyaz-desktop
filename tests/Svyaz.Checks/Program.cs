@@ -9,6 +9,16 @@ using System.Text;
 using System.Buffers.Binary;
 using Svyaz.Core;
 
+if (args.FirstOrDefault() == "--update-release-smoke")
+{
+    using var updater = new ReleaseUpdateService();
+    using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+    var installed = args.Length > 1 ? Version.Parse(args[1]) : new Version(0, 0, 0);
+    var release = await updater.CheckAsync(installed, true, timeout.Token) ?? throw new Exception("No newer verified release found.");
+    var path = await updater.DownloadAsync(release, Path.GetFullPath("artifacts/update-download-smoke"), null, timeout.Token);
+    Console.WriteLine($"PASS GitHub update {release.Version}: downloaded {new FileInfo(path).Length} bytes, SHA-256 verified.");
+    return 0;
+}
 if (args.FirstOrDefault() == "--sleep") { await Task.Delay(TimeSpan.FromMinutes(2)); return 0; }
 if (args.FirstOrDefault() == "--job-owner")
 {
@@ -209,6 +219,7 @@ if (args.FirstOrDefault() == "--proxy-browser-trials")
 }
 
 var failed = 0;
+foreach (var test in UpdateChecks.Cases()) await Check(test.Name, test.Test);
 await Check("AES-256 CTR matches the NIST vector across partial reads", () =>
 {
     var key = Convert.FromHexString("603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4");
