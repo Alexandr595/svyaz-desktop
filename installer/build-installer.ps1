@@ -7,12 +7,8 @@ Set-Location -LiteralPath $workspace
 $version = [string]$project.Project.PropertyGroup.Version
 $payload = Join-Path $workspace "artifacts\installer-payload\Svyaz-$version"
 $compiler = Join-Path $workspace 'tools\nsis\nsis-3.13\makensis.exe'
-$nsisHash = 'BA63DFFC4410EE89193E1CB5A41989991BD77C61068DA17E3156D136B7B0B3D8'
 if (!(Test-Path -LiteralPath $compiler)) {
-    $archive = Join-Path $workspace 'vendor\nsis-3.13.zip'
-    New-Item -ItemType Directory -Path (Split-Path -Parent $archive) -Force | Out-Null
-    Invoke-WebRequest -Uri 'https://pilotfiber.dl.sourceforge.net/project/nsis/NSIS%203/3.13/nsis-3.13.zip' -OutFile $archive
-    if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $nsisHash) { throw 'NSIS archive SHA-256 mismatch.' }
+    $archive = & (Join-Path $workspace 'tools\fetch-nsis.ps1')
     Expand-Archive -LiteralPath $archive -DestinationPath (Join-Path $workspace 'tools\nsis') -Force
 }
 dotnet run --project tools/Svyaz.AssetBuilder/Svyaz.AssetBuilder.csproj -c Release --no-launch-profile
