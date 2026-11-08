@@ -10,10 +10,13 @@ public sealed record AppConfig
     public string[] Targets { get; init; } = ServiceCatalog.AllDomains;
     public string[] Canaries { get; init; } = ["https://example.com/", "https://www.microsoft.com/"];
     public string Profile { get; init; } = "z-fake-md5";
+    public Dictionary<string, string> ServiceProfiles { get; init; } = new();
+    public bool RememberNetworkProfiles { get; init; } = true;
+    public bool AutoRepairProfiles { get; init; } = true;
     public string NetworkName { get; init; } = "Не указан";
     public string InterfaceId { get; init; } = "";
-    public string TelegramProxy { get; init; } = "socks5://212.77.75.25:1088";
-    public string[] TelegramProxyBackups { get; init; } = ["socks5://47.90.162.114:5555", "socks5://81.162.123.152:10808"];
+    public string TelegramProxy { get; init; } = "";
+    public string[] TelegramProxyBackups { get; init; } = [];
     public int LocalProxyPort { get; init; } = 18080;
     public int TelegramLocalPort { get; init; } = 18081;
     public bool OpenBrowserOnStart { get; init; } = false;
@@ -35,6 +38,10 @@ public sealed record AppConfig
         if (Canaries is null || Canaries.Length is < 1 or > 32)
             throw new ArgumentException("Укажите от 1 до 32 контрольных HTTPS-адресов.");
         if (Profile is not ("gentle" or "sni") && !ZapretEngine.Profiles.Any(p => p.Id == Profile)) throw new ArgumentException("Неизвестный профиль.");
+        if (ServiceProfiles is null || ServiceProfiles.Count > 4) throw new ArgumentException("Некорректные профили сервисов.");
+        foreach (var pair in ServiceProfiles)
+            if (!ServiceStrategies.Services.Contains(pair.Key) || !ServiceStrategies.IsProfile(pair.Value))
+                throw new ArgumentException("Неизвестный профиль сервиса.");
         if (string.IsNullOrWhiteSpace(NetworkName) || NetworkName.Length > 80 || NetworkName.Any(char.IsControl))
             throw new ArgumentException("Название сети: от 1 до 80 символов без перевода строки.");
         if (InterfaceId is null || InterfaceId.Length > 100 || InterfaceId.Any(char.IsControl))

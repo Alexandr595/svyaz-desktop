@@ -83,6 +83,10 @@ public partial class MainWindow : Window
         OpenBrowserBox.IsChecked = config.OpenBrowserOnStart;
         DesktopProxyBox.IsChecked = config.DesktopProxy;
         DiscordVoiceBox.IsChecked = config.DiscordVoice;
+        RememberProfilesBox.IsChecked = config.RememberNetworkProfiles;
+        RepairProfilesBox.IsChecked = config.AutoRepairProfiles;
+        RenderServiceProfiles(config);
+        session.RepairAsync = async (current, token) => await TuneProfilesAsync(current, token);
         GlassBox.IsChecked = config.GlassAppearance;
         AdminLabel.Text = IsAdmin ? "Права администратора доступны" : "Для обработки понадобится запуск от администратора";
         try { ZapretEngine.VerifyBundle(Path.Combine(AppContext.BaseDirectory, "engine", "zapret2")); EngineLabel.Text = "zapret2 1.0.6 · SHA-256 проверен"; }
@@ -92,6 +96,7 @@ public partial class MainWindow : Window
         AddLog("TLS/TCP 443; UDP Discord по умолчанию проходит без изменений. Telegram Desktop использует локальный MTProxy. Голос проверяется в самом Discord; HTTP 200 его не подтверждает.");
         NativeChatGptState.Text = config.ChatGptProxy.Length == 0 ? "Внешний SOCKS5 ChatGPT не настроен; сейчас используется прямой выход. Нативному клиенту также требуется разрешить системный маршрут." : "SOCKS5 для ChatGPT настроен. Разрешите системный маршрут кнопкой справа и полностью перезапустите ChatGPT после завершения текущей работы.";
         Loaded += (_, _) => { if (Environment.GetCommandLineArgs().Contains("--start")) Start_Click(this, new RoutedEventArgs()); };
+        Loaded += (_, _) => { if (Environment.GetCommandLineArgs().Contains("--tune")) TuneProfiles_Click(this, new RoutedEventArgs()); };
         controlTimer.Tick += (_, _) =>
         {
             UpdateLiveMetrics();
@@ -144,6 +149,7 @@ public partial class MainWindow : Window
             TelegramProxy = TelegramProxyBox.Text.Trim(), ChatGptProxy = ChatGptProxyBox.Text.Trim(),
             OpenBrowserOnStart = OpenBrowserBox.IsChecked == true,
             DesktopProxy = DesktopProxyBox.IsChecked == true, DiscordVoice = DiscordVoiceBox.IsChecked == true,
+            RememberNetworkProfiles = RememberProfilesBox.IsChecked == true, AutoRepairProfiles = RepairProfilesBox.IsChecked == true,
             GlassAppearance = GlassBox.IsChecked == true
         }).Validate();
         next.Save(ConfigPath);
@@ -189,7 +195,8 @@ public partial class MainWindow : Window
         if (operation != null) return;
         try
         {
-            var current = ReadConfig();
+            var current = ApplyNetworkProfile(ReadConfig());
+            config = current;
             if (current.Profile.StartsWith("z-", StringComparison.Ordinal)) ZapretEngine.VerifyBundle(Path.Combine(AppContext.BaseDirectory, "engine", "zapret2"));
             else GoodbyeEngine.VerifyBundle(Path.Combine(AppContext.BaseDirectory, "engine"));
             if (!IsAdmin)
@@ -494,6 +501,7 @@ public partial class MainWindow : Window
     private void SetBusy(bool busy)
     {
         StartButton.IsEnabled = CheckButton.IsEnabled = SettingsPanel.IsEnabled = !busy;
+        TuneProfilesButton.IsEnabled = ResetProfilesButton.IsEnabled = StrategyOptions.IsEnabled = !busy;
         StopButton.IsEnabled = busy || engine.IsRunning || proxy?.IsRunning == true;
     }
     private void EndOperation()

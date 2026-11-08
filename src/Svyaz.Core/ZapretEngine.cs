@@ -80,14 +80,27 @@ public sealed class ZapretEngine(string directory, string dataDirectory) : IEngi
             args.AddRange(["--filter-tcp=443", "--ipset-ip=" + string.Join(',', ips), "--payload=empty",
                 "--lua-desync=syndata:blob=tls_google", "--new"]);
         }
-        args.AddRange(["--filter-tcp=" + tcpPorts, "--filter-l7=tls", "--hostlist=" + hostList,
-            "--hostlist-exclude=" + excludeList, "--payload=tls_client_hello", "--out-range=-d4"]);
         var proxyIps = new[] { config.TelegramProxy, config.ChatGptProxy }.Concat(config.TelegramProxyBackups).Concat(config.ChatGptProxyBackups)
             .Where(p => p.Length != 0).Select(p => TelegramRoute.ParseProxy(p)!.Host)
             .Where(host => IPAddress.TryParse(host, out _)).Distinct().ToArray();
-        if (proxyIps.Length != 0) args.Add("--ipset-exclude-ip=" + string.Join(',', proxyIps));
+        foreach (var pair in config.ServiceProfiles.OrderBy(p => p.Key, StringComparer.Ordinal))
+        {
+            var domains = ServiceStrategies.Domains(config, pair.Key);
+            if (domains.Length == 0) continue;
+            AddTlsScope("--hostlist-domains=" + string.Join(',', domains));
+            args.AddRange(ServiceStrategies.Actions(pair.Value).Select(a => "--lua-desync=" + a));
+            args.Add("--new");
+        }
+        AddTlsScope("--hostlist=" + hostList);
         args.AddRange(profile.Actions.Select(a => "--lua-desync=" + a));
         return args.ToArray();
+
+        void AddTlsScope(string hosts)
+        {
+            args.AddRange(["--filter-tcp=" + tcpPorts, "--filter-l7=tls", hosts,
+                "--hostlist-exclude=" + excludeList, "--payload=tls_client_hello", "--out-range=-d4"]);
+            if (proxyIps.Length != 0) args.Add("--ipset-exclude-ip=" + string.Join(',', proxyIps));
+        }
     }
 
     public void Start(AppConfig config)

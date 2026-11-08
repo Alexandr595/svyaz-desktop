@@ -36,6 +36,20 @@ if (args.FirstOrDefault() == "--diagnose")
     Console.WriteLine(JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true }));
     return 0;
 }
+if (args.FirstOrDefault() == "--tune-direct")
+{
+    var settings = AppConfig.Load(args[1]);
+    if (args.Length > 4) settings = settings with { Targets = settings.Targets.Where(t => args.Skip(4).Any(service => ServiceStrategies.Domains(settings, service).Contains(t))).ToArray() };
+    using var engine = new AdaptiveEngine(Path.GetFullPath(args[2]), Path.GetFullPath(args[3]));
+    var tuner = new StrategyTuner(new DirectStrategyProbe(), engine);
+    tuner.Progress += Console.Error.WriteLine;
+    using var deadline = new CancellationTokenSource(TimeSpan.FromMinutes(5));
+    var report = await tuner.RunAsync(settings, deadline.Token);
+    var json = JsonSerializer.Serialize(new { report.Verified, report.Changed, report.Detail, profiles = report.Config.ServiceProfiles, report.Trials }, new JsonSerializerOptions { WriteIndented = true });
+    File.WriteAllText(Path.Combine(Path.GetFullPath(args[3]), "strategy-last.json"), json);
+    Console.WriteLine(json);
+    return report.Verified ? 0 : 1;
+}
 if (args.FirstOrDefault() == "--system-proxy-state")
 {
     Console.WriteLine(JsonSerializer.Serialize(new WindowsInternetProxySettings().Read())); return 0;
@@ -285,6 +299,7 @@ if (args.FirstOrDefault() == "--proxy-browser-trials")
 
 var failed = 0;
 foreach (var test in UpdateChecks.Cases()) await Check(test.Name, test.Test);
+foreach (var test in StrategyChecks.Cases()) await Check(test.Name, test.Test);
 await Check("AES-256 CTR matches the NIST vector across partial reads", () =>
 {
     var key = Convert.FromHexString("603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4");

@@ -117,6 +117,19 @@
             <TextBlock Text="Публичные узлы могут отключиться в любой момент; можно указать собственный SOCKS5. Сертификаты TLS проверяются. Два сбоя контрольного сервиса подряд останавливают обработку. Настройки системного прокси восстанавливаются при остановке." FontSize="11" Foreground="{StaticResource Muted}" TextWrapping="Wrap" LineHeight="18" Margin="0,0,0,14" /><Button Content="Сохранить настройки" Click="Save_Click" HorizontalAlignment="Left" />
           </StackPanel></ScrollViewer>
         </TabItem>
+        <TabItem Header="Прямой обход">
+          <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="0,0,12,0">
+            <TextBlock Text="Подбор под вашу сеть" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,12" />
+            <TextBlock Text="Проверим стратегии прямого подключения и сохраним профиль для каждого сервиса. Выберите физический интерфейс и укажите название сети в настройках. Во время подбора движок несколько раз перезапустится; сеансы приложений могут переподключиться." Foreground="{StaticResource Muted}" TextWrapping="Wrap" LineHeight="20" Margin="0,0,0,16" />
+            <StackPanel x:Name="StrategyOptions">
+              <CheckBox x:Name="RememberProfilesBox" Content="Запоминать проверенные профили для этой сети" IsChecked="True" Margin="0,0,0,12" />
+              <CheckBox x:Name="RepairProfilesBox" Content="Один раз подобрать профиль после двух сбоев прямого сервиса" IsChecked="True" Margin="0,0,0,12" />
+            </StackPanel>
+            <WrapPanel Margin="0,0,0,16"><Button x:Name="TuneProfilesButton" Content="Подобрать прямой обход" Click="TuneProfiles_Click" Margin="0,0,12,0" /><Button x:Name="ResetProfilesButton" Content="Сбросить профили этой сети" Click="ResetProfiles_Click" /></WrapPanel>
+            <Border Background="{StaticResource Panel}" CornerRadius="10" Padding="18"><TextBlock x:Name="StrategyStatus" Text="Подбор ещё не выполнен" TextWrapping="Wrap" LineHeight="22" /></Border>
+            <TextBlock Text="Подбор занимает до пяти минут и использует только запросы без авторизации. Сервисы с настроенным внешним SOCKS5 сохраняют свой маршрут. Голос Discord, воспроизведение YouTube и аккаунты требуют отдельной проверки. Для остановки подбора нажмите «Остановить»." Foreground="{StaticResource Muted}" TextWrapping="Wrap" LineHeight="20" Margin="0,16,0,0" />
+          </StackPanel></ScrollViewer>
+        </TabItem>
         <TabItem Header="Обновления">
           <ScrollViewer VerticalScrollBarVisibility="Auto"><StackPanel Margin="0,0,12,0">
             <TextBlock Text="Новые версии из GitHub Releases" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,12" />

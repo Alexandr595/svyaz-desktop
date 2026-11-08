@@ -18,6 +18,7 @@ public sealed class SessionController(IProbeService probes, IEngine engine)
     public event Action<string>? Log;
     public TimeSpan InitialDelay { get; init; } = TimeSpan.FromSeconds(1);
     public TimeSpan? IntervalOverride { get; init; }
+    public Func<AppConfig, CancellationToken, Task<AppConfig?>>? RepairAsync { get; set; }
 
     public async Task RunAsync(AppConfig config, CancellationToken token)
     {
@@ -25,6 +26,7 @@ public sealed class SessionController(IProbeService probes, IEngine engine)
             throw new InvalidOperationException("Сеанс уже запущен.");
         var terminal = SessionState.Idle;
         var message = "Обработка выключена";
+        var repaired = false;
         try
         {
             config = config.Validate();
@@ -48,6 +50,34 @@ public sealed class SessionController(IProbeService probes, IEngine engine)
                 var regression = policy.Observe(results);
                 if (regression != null)
                 {
+                    // Canary failures never trigger more packet manipulation.
+                    // At most one bounded repair is attempted per connection.
+                    if (!repaired && config.AutoRepairProfiles && RepairAsync != null && config.InterfaceId.Length != 0 &&
+                        ServiceStrategies.IsProfile(config.Profile) && config.Profile != "direct" &&
+                        results.Where(r => r.IsCanary).All(r => r.Healthy) && !baseline.Any(r => r.IsCanary && new Uri(r.Url).Host == regression))
+                    {
+                        repaired = true;
+                        Log?.Invoke("Два сбоя прямого сервиса. Проверяем другие профили; локальный прокси продолжает работать.");
+                        StateChanged?.Invoke(SessionState.Checking, "Подбираем прямой профиль после сбоя…");
+                        engine.Stop();
+                        var replacement = await RepairAsync(config, token);
+                        token.ThrowIfCancellationRequested();
+                        config = replacement ?? config;
+                        engine.Start(config);
+                        await Task.Delay(InitialDelay, token);
+                        var retry = await probes.CheckAsync(config, token);
+                        token.ThrowIfCancellationRequested();
+                        policy = new HealthPolicy(baseline);
+                        _ = policy.Observe(retry);
+                        if (engine.IsRunning && policy.Observe(retry) == null)
+                        {
+                            policy = new HealthPolicy(baseline);
+                            ResultsChanged?.Invoke(retry);
+                            StateChanged?.Invoke(SessionState.Running, "Прямое соединение повторно проверено после подбора");
+                            await Task.Delay(IntervalOverride ?? TimeSpan.FromSeconds(config.IntervalSeconds), token);
+                            continue;
+                        }
+                    }
                     terminal = SessionState.RolledBack;
                     message = $"Автоостановка: потерян ранее доступный ответ у {regression} два раза подряд";
                     Log?.Invoke(message + ". Причина сбоя может быть внешней; обработка остановлена для проверки.");

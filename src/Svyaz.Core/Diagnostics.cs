@@ -12,6 +12,7 @@ public sealed record ProbeResult(string Url, bool IsCanary, bool Healthy, int? S
     public bool HttpsResponded => StatusCode.HasValue;
     public bool AccessNeedsBrowserCheck => StatusCode is 401 or 403;
     public bool ViaExternalProxy { get; init; }
+    public long BodyBytes { get; init; }
 }
 
 public interface IProbeService
@@ -38,7 +39,7 @@ public sealed class HttpsProbeService : IProbeService
 
     public static async Task<ProbeResult> ProbeAsync(string url, bool isCanary, int timeoutSeconds,
         CancellationToken token, string interfaceId = "", string telegramProxy = "", string[]? telegramProxyBackups = null,
-        string chatGptProxy = "", string[]? chatGptProxyBackups = null, Uri? localProxy = null)
+        string chatGptProxy = "", string[]? chatGptProxyBackups = null, Uri? localProxy = null, int readBodyBytes = 0)
     {
         var watch = Stopwatch.StartNew();
         // A fresh direct HTTP/1.1 connection checks a new TLS handshake on every pass.
@@ -69,9 +70,21 @@ public sealed class HttpsProbeService : IProbeService
             request.Headers.UserAgent.ParseAdd("Svyaz/0.2.1");
             using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, deadline.Token);
             var code = (int)response.StatusCode;
+            long bytes = 0;
+            if (code is >= 200 and < 300 && readBodyBytes > 0)
+            {
+                await using var stream = await response.Content.ReadAsStreamAsync(deadline.Token);
+                var buffer = new byte[Math.Min(readBodyBytes, 32768)];
+                while (bytes < readBodyBytes)
+                {
+                    var count = await stream.ReadAsync(buffer.AsMemory(0, (int)Math.Min(buffer.Length, readBodyBytes - bytes)), deadline.Token);
+                    if (count == 0) break;
+                    bytes += count;
+                }
+            }
             return new(url, isCanary, code is >= 200 and < 400, code, watch.ElapsedMilliseconds,
-                code is >= 300 and < 400 ? $"HTTP {code} · перенаправление, переход не проверен" : $"HTTP {code}", DateTimeOffset.Now)
-                { ViaExternalProxy = viaExternal };
+                code is >= 300 and < 400 ? $"HTTP {code} · перенаправление, переход не проверен" : $"HTTP {code}" + (readBodyBytes > 0 ? $" · получено {bytes} байт страницы" : ""), DateTimeOffset.Now)
+                { ViaExternalProxy = viaExternal, BodyBytes = bytes };
         }
         catch (OperationCanceledException) when (!token.IsCancellationRequested)
         { return Failure("Тайм-аут DNS / TCP / TLS / HTTP"); }
