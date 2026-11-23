@@ -7,7 +7,7 @@ Unicode true
 !include "TextFunc.nsh"
 
 !ifndef APP_VERSION
-  !define APP_VERSION "0.5.0"
+  !define APP_VERSION "0.5.1"
 !endif
 !ifndef PAYLOAD
   !error "PAYLOAD must point to a self-contained publish directory."
@@ -159,7 +159,23 @@ FunctionEnd
 Section "Связь Desktop" CoreSection
   Call StopInstalledApp
   SetOutPath "$INSTDIR"
-  File /r "${PAYLOAD}\*.*"
+  ClearErrors
+  File /r /x WinDivert64.sys "${PAYLOAD}\*.*"
+  ; Preserve an unchanged pinned driver that Windows can keep locked after
+  ; its client exits. The app still verifies all engine files with SHA-256.
+  SetOverwrite ifdiff
+  SetOutPath "$INSTDIR\engine"
+  File "${PAYLOAD}\engine\WinDivert64.sys"
+  SetOutPath "$INSTDIR\engine\zapret2"
+  File "${PAYLOAD}\engine\zapret2\WinDivert64.sys"
+  SetOverwrite on
+  SetOutPath "$INSTDIR"
+  ${If} ${Errors}
+    IfSilent +2
+    MessageBox MB_ICONSTOP "Не все файлы удалось обновить. Установка не завершена. Закройте «Связь» и повторите установку."
+    SetErrorLevel 1
+    Abort
+  ${EndIf}
   ${If} $ImportData != ""
     IfFileExists "$INSTDIR\data\settings.json" skip_import
     CreateDirectory "$INSTDIR\data"

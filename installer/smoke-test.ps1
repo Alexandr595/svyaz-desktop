@@ -39,7 +39,14 @@ try {
     if ([IO.File]::ReadAllText($settings) -ne $fixtureConfig -or [IO.File]::ReadAllText($secret) -ne $fixtureSecret) { throw 'Settings import failed.' }
     [IO.File]::WriteAllText((Join-Path $testRoot 'user-file.txt'), 'This user file must survive uninstall.')
     [IO.File]::WriteAllText((Join-Path $fixture 'settings.json'), '{"NetworkName":"Replacement must not overwrite"}')
-    Install-TestCopy -Update
+    $driverPath = Join-Path $testRoot 'engine\zapret2\WinDivert64.sys'
+    $driverHashBefore = (Get-FileHash -LiteralPath $driverPath -Algorithm SHA256).Hash
+    $driverReadLease = [IO.File]::Open($driverPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    try { Install-TestCopy -Update }
+    finally { $driverReadLease.Dispose() }
+    if ((Get-FileHash -LiteralPath $driverPath -Algorithm SHA256).Hash -ne $driverHashBefore) { throw 'Unchanged driver bytes changed during upgrade.' }
+    $expectedVersion = [Diagnostics.FileVersionInfo]::GetVersionInfo($setup).FileVersion
+    if ([Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $testRoot 'Svyaz.exe')).FileVersion -ne "$expectedVersion.0") { throw 'Upgrade did not install the requested application version.' }
     if ([IO.File]::ReadAllText($settings) -ne $fixtureConfig) { throw 'Upgrade overwrote existing settings.' }
     if ([Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $testRoot 'Uninstall.exe')).ProductName -cne 'Связь Desktop') { throw 'Uninstaller Russian text is corrupted.' }
     $start = [Diagnostics.ProcessStartInfo]::new((Join-Path $testRoot 'Svyaz.exe'))
@@ -59,7 +66,7 @@ try {
     if (!(Test-Path -LiteralPath $settings) -or !(Test-Path -LiteralPath (Join-Path $testRoot 'user-file.txt'))) { throw 'Uninstall removed user data.' }
     $report = [ordered]@{ checkedAt=[DateTimeOffset]::Now; install=$true; selfContained=$true; import=$true; updateMode=$true; russianText=$true; spacedPath=$true; previousVersion=([bool]$PreviousInstaller); upgradePreservesSettings=$true; uninstall=$true; userDataPreserved=$true; testMode=$true }
     $report | ConvertTo-Json | Set-Content -LiteralPath artifacts/installer-smoke.json -Encoding utf8
-    Write-Output 'PASS install, self-contained launch, settings import, upgrade, uninstall, and user-data preservation.'
+    Write-Output 'PASS install, self-contained launch, settings import, upgrade with a locked unchanged driver, uninstall, and user-data preservation.'
 }
 finally {
     foreach ($path in @($testRoot,$fixture)) {
