@@ -60,19 +60,36 @@ public sealed class SessionController(IProbeService probes, IEngine engine)
                         Log?.Invoke("Два сбоя прямого сервиса. Проверяем другие профили; локальный прокси продолжает работать.");
                         StateChanged?.Invoke(SessionState.Checking, "Подбираем прямой профиль после сбоя…");
                         engine.Stop();
+                        // A target can become unavailable independently of DPI handling.
+                        // Measure it again with the engine stopped, rather than judging
+                        // every replacement against a stale, single baseline response.
+                        var stoppedA = await probes.CheckAsync(config, token);
+                        var stoppedB = await probes.CheckAsync(config, token);
+                        token.ThrowIfCancellationRequested();
+                        var stopped = StrategySnapshot.Stable(new(stoppedA, []), new(stoppedB, []));
+                        if (!stopped.ControlsHealthy)
+                        {
+                            terminal = SessionState.RolledBack;
+                            message = "Автоостановка: контрольные адреса недоступны и без обработки";
+                            Log?.Invoke(message + ". Подбор профиля не запускался.");
+                            break;
+                        }
+                        if (!stopped.Http.Any(r => !r.IsCanary && new Uri(r.Url).Host == regression && r.HttpsResponded))
+                            Log?.Invoke($"Ответ {regression} не подтверждён и без обработки. После подбора контролируется свежая прямая проверка; доступ к этому сервису не подтверждён.");
                         var replacement = await RepairAsync(config, token);
                         token.ThrowIfCancellationRequested();
                         config = replacement ?? config;
                         engine.Start(config);
                         await Task.Delay(InitialDelay, token);
                         var retry = await probes.CheckAsync(config, token);
+                        var retryRepeat = await probes.CheckAsync(config, token);
                         token.ThrowIfCancellationRequested();
-                        policy = new HealthPolicy(baseline);
+                        policy = new HealthPolicy(stopped.Http);
                         _ = policy.Observe(retry);
-                        if (engine.IsRunning && policy.Observe(retry) == null)
+                        if (engine.IsRunning && policy.Observe(retryRepeat) == null)
                         {
-                            policy = new HealthPolicy(baseline);
-                            ResultsChanged?.Invoke(retry);
+                            baseline = stopped.Http;
+                            ResultsChanged?.Invoke(retryRepeat);
                             StateChanged?.Invoke(SessionState.Running, "Прямое соединение повторно проверено после подбора");
                             await Task.Delay(IntervalOverride ?? TimeSpan.FromSeconds(config.IntervalSeconds), token);
                             continue;

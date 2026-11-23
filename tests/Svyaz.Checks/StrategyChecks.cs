@@ -106,10 +106,66 @@ static class StrategyChecks
         ("Two direct service failures permit only one repair and recheck the result", async () =>
         {
             using var engine = new TestEngine(); var n = 0; var repairs = 0;
-            var controller = new SessionController(new HttpProbes(() => true, () => ++n is 1 or 4), engine)
+            var controller = new SessionController(new HttpProbes(() => true, () => ++n is 1 or 4 or 5 or 6 or 7), engine)
             { InitialDelay = TimeSpan.Zero, IntervalOverride = TimeSpan.Zero,
                 RepairAsync = (c, _) => { Assert(!engine.IsRunning); repairs++; return Task.FromResult<AppConfig?>(c); } };
             await controller.RunAsync(Config, CancellationToken.None); Assert(repairs == 1 && !engine.IsRunning);
+        }),
+        ("Repair keeps other services running when the failed endpoint also fails without the engine", async () =>
+        {
+            using var engine = new TestEngine(); using var cancel = new CancellationTokenSource();
+            var n = 0; var repairs = 0; var running = 0;
+            var probes = new HttpProbes(() => true, () =>
+            {
+                n++;
+                if (n is 4 or 5) Assert(!engine.IsRunning);
+                return n == 1;
+            });
+            var controller = new SessionController(probes, engine)
+            {
+                InitialDelay = TimeSpan.Zero, IntervalOverride = TimeSpan.Zero,
+                RepairAsync = (c, _) => { Assert(n == 5 && !engine.IsRunning); repairs++; return Task.FromResult<AppConfig?>(c); }
+            };
+            controller.StateChanged += (state, _) => { if (state == SessionState.Running && engine.Starts == 2) { running++; cancel.Cancel(); } };
+            await controller.RunAsync(Config, cancel.Token);
+            Assert(repairs == 1 && running == 1 && engine.Starts == engine.Stops);
+        }),
+        ("Repair still rolls back when an endpoint answers without the engine but fails with it", async () =>
+        {
+            using var engine = new TestEngine(); var repairs = 0; var terminal = SessionState.Idle;
+            var controller = new SessionController(new HttpProbes(() => true, () => !engine.IsRunning), engine)
+            {
+                InitialDelay = TimeSpan.Zero, IntervalOverride = TimeSpan.Zero,
+                RepairAsync = (c, _) => { repairs++; return Task.FromResult<AppConfig?>(c); }
+            };
+            controller.StateChanged += (state, _) => terminal = state;
+            await controller.RunAsync(Config, CancellationToken.None);
+            Assert(repairs == 1 && terminal == SessionState.RolledBack && !engine.IsRunning);
+        }),
+        ("A failed control in the stopped-engine baseline prevents strategy repair", async () =>
+        {
+            using var engine = new TestEngine(); var n = 0; var repairs = 0; var terminal = SessionState.Idle;
+            var controller = new SessionController(new HttpProbes(() => ++n != 4, () => n == 1), engine)
+            {
+                InitialDelay = TimeSpan.Zero, IntervalOverride = TimeSpan.Zero,
+                RepairAsync = (c, _) => { repairs++; return Task.FromResult<AppConfig?>(c); }
+            };
+            controller.StateChanged += (state, _) => terminal = state;
+            await controller.RunAsync(Config, CancellationToken.None);
+            Assert(repairs == 0 && terminal == SessionState.RolledBack && engine.Starts == 1 && !engine.IsRunning);
+        }),
+        ("Repair uses two fresh observations instead of counting one failed retry twice", async () =>
+        {
+            using var engine = new TestEngine(); using var cancel = new CancellationTokenSource();
+            var n = 0; var running = 0;
+            var controller = new SessionController(new HttpProbes(() => true, () => ++n is 1 or 4 or 5 or 7), engine)
+            {
+                InitialDelay = TimeSpan.Zero, IntervalOverride = TimeSpan.Zero,
+                RepairAsync = (c, _) => Task.FromResult<AppConfig?>(c)
+            };
+            controller.StateChanged += (state, _) => { if (state == SessionState.Running && engine.Starts == 2) { running++; cancel.Cancel(); } };
+            await controller.RunAsync(Config, cancel.Token);
+            Assert(n == 7 && running == 1 && !engine.IsRunning);
         })
     ];
     sealed class TestProbes(Func<AppConfig, StrategySnapshot> get) : IStrategyProbe
