@@ -92,7 +92,7 @@ public partial class MainWindow : Window
         try { ZapretEngine.VerifyBundle(Path.Combine(AppContext.BaseDirectory, "engine", "zapret2")); EngineLabel.Text = "zapret2 1.0.6 · SHA-256 проверен"; }
         catch (Exception ex) { EngineLabel.Text = "Движок недоступен · см. журнал"; AddLog(ex.Message); }
         if (configError) ShowError(new ArgumentException("Файл настроек повреждён. Проверьте значения и нажмите «Сохранить настройки»."));
-        AddLog("Готово к работе. Добавлены стартовые списки ChatGPT, Telegram, Discord, YouTube. Контрольные адреса замените своими критичными сервисами.");
+        AddLog($"Готово к работе. В списке обработки {config.Targets.Length} доменов. Контрольные адреса замените своими критичными сервисами.");
         AddLog("TLS/TCP 443; UDP Discord по умолчанию проходит без изменений. Telegram Desktop использует локальный MTProxy. Голос проверяется в самом Discord; HTTP 200 его не подтверждает.");
         NativeChatGptState.Text = config.ChatGptProxy.Length == 0 ? "Внешний SOCKS5 ChatGPT не настроен; сейчас используется прямой выход. Нативному клиенту также требуется разрешить системный маршрут." : "SOCKS5 для ChatGPT настроен. Разрешите системный маршрут кнопкой справа и полностью перезапустите ChatGPT после завершения текущей работы.";
         Loaded += (_, _) => { if (Environment.GetCommandLineArgs().Contains("--start")) Start_Click(this, new RoutedEventArgs()); };

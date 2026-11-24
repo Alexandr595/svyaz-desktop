@@ -7,7 +7,7 @@ namespace Svyaz.Core;
 public sealed record AppConfig
 {
     public int SchemaVersion { get; init; } = 2;
-    public string[] Targets { get; init; } = ServiceCatalog.AllDomains;
+    public string[] Targets { get; init; } = ServiceCatalog.DefaultDomains;
     public string[] Canaries { get; init; } = ["https://example.com/", "https://www.microsoft.com/"];
     public string Profile { get; init; } = "z-fake-md5";
     public Dictionary<string, string> ServiceProfiles { get; init; } = new();

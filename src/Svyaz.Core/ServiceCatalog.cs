@@ -13,6 +13,8 @@ public static class ServiceCatalog
         new("YouTube", "https://www.youtube.com/", ["youtube.com", "youtu.be", "youtube-nocookie.com", "googlevideo.com", "ytimg.com", "youtubei.googleapis.com", "youtube.googleapis.com", "ggpht.com"])
     ];
     public static string[] AllDomains => Presets.SelectMany(p => p.Domains).Distinct().ToArray();
+    public static string[] DefaultDomains => Presets.Where(p => p.Name is "Telegram" or "Discord" or "YouTube")
+        .SelectMany(p => p.Domains).Distinct().ToArray();
 
     public static string[] ProbeUrls(IEnumerable<string> domains)
     {

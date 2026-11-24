@@ -758,8 +758,11 @@ await Check("Service presets probe main pages rather than CDN apexes", () =>
 {
     var config = new AppConfig().Validate();
     var urls = ServiceCatalog.ProbeUrls(config.Targets);
-    Assert(config.Targets.Length <= 32 && urls.Length == 4);
-    Assert(urls.Contains("https://chatgpt.com/") && urls.Contains("https://web.telegram.org/"));
+    Assert(config.Targets.Length <= 32 && urls.Length == 3);
+    Assert(urls.ToHashSet().SetEquals(["https://web.telegram.org/", "https://discord.com/", "https://www.youtube.com/"]));
+    Assert(!config.Targets.Any(TelegramRoute.IsChatGpt));
+    Assert(ServiceStrategies.Eligible(config).ToHashSet().SetEquals(["Telegram", "Discord", "YouTube"]));
+    Assert(ServiceCatalog.ProbeUrls(ServiceCatalog.AllDomains).Contains("https://chatgpt.com/"));
     Assert(!urls.Any(u => u.Contains("googlevideo.com")));
     Assert(ServiceCatalog.ProbeUrls(["custom.example.net"]).Single() == "https://custom.example.net/");
     return Task.CompletedTask;
@@ -794,6 +797,8 @@ await Check("Atomic configuration round-trip", () =>
         new AppConfig().Save(path);
         Assert(AppConfig.Load(path).Targets.SequenceEqual(new AppConfig().Targets));
         Assert(!File.Exists(path + ".tmp"));
+        new AppConfig { Targets = ServiceCatalog.AllDomains }.Save(path);
+        Assert(AppConfig.Load(path).Targets.SequenceEqual(ServiceCatalog.AllDomains));
     }
     finally { Directory.Delete(folder, true); }
     return Task.CompletedTask;
